@@ -6,7 +6,7 @@ namespace DSLink.Broker
 {
     public class ConnectionHandler
     {
-        private Dictionary<string, ServerLink> _links;
+        private readonly Dictionary<string, ServerLink> _links;
 
         public ConnectionHandler()
         {
