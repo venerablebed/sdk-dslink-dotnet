@@ -14,15 +14,17 @@ namespace DSLink.Broker.Objects
 
     public class ConnResponseObject
     {
-        public string id;
+        public string dsId;
         public string publicKey;
         public string wsUri;
         public string httpUri;
-        public int updateInterval;
         public string version;
         public string tempKey;
         public string salt;
         public string saltS;
         public string saltL;
+        public string format;
+        public string path;
+        public string error;
     }
 }

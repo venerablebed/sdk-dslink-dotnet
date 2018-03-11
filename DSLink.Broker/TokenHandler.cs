@@ -4,7 +4,7 @@
     {
         public bool ValidateToken(string token)
         {
-            // TODO: Implement token
+            // TODO: Implement token validation
             return false;
         }
     }

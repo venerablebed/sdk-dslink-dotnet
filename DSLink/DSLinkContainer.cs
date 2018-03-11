@@ -105,9 +105,10 @@ namespace DSLink
             uint attempts = 1;
             while (maxAttempts == 0 || attemptsLeft > 0)
             {
-                _config.RemoteEndpoint = await _handshake.Shake();
-                if (_config.RemoteEndpoint != null)
+                var handshakeResult = await _handshake.Shake();
+                if (handshakeResult != null)
                 {
+                    _config.RemoteEndpoint = handshakeResult;
                     await Connector.Connect();
                     return Connector.ConnectionState;
                 }

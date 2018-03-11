@@ -1,6 +1,8 @@
-﻿using DSLink.Broker.Objects;
+﻿using System.IO;
+using DSLink.Broker.Objects;
 using DSLink.Util;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace DSLink.Broker.Controllers
@@ -15,9 +17,12 @@ namespace DSLink.Broker.Controllers
         }
 
         [HttpPost]
-        public JObject Post([FromBody] ConnRequestObject requestObject, [FromQuery(Name = "dsId")] string dsId,
+        public ConnResponseObject Post([FromQuery(Name = "dsId")] string dsId,
             [FromQuery(Name = "token")] string token)
         {
+            var bodyReader = new StreamReader(Request.Body);
+            var body = bodyReader.ReadToEnd();
+            var requestObject = JsonConvert.DeserializeObject<ConnRequestObject>(body);
             var error = "";
 
             if (string.IsNullOrEmpty(requestObject.publicKey))
@@ -57,12 +62,13 @@ namespace DSLink.Broker.Controllers
                 Program.Broker.ConnectionHandler.AddLink(link);
             }
             
-            return new JObject();
+            link.SetRequestObject(requestObject);
+            return Program.Broker.ConnectionHandler.InitLink(link);
             
             error:
-            return new JObject
+            return new ConnResponseObject
             {
-                new JProperty("error", error)
+                error = error
             };
         }
     }

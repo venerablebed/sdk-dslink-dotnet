@@ -15,7 +15,6 @@ namespace DSLink
     public class Configuration
     {
         private readonly IEnumerable<string> _args;
-        private readonly SHA256 _sha256;
         private IVFS _vfs;
 
         public readonly string Name;
@@ -31,10 +30,10 @@ namespace DSLink
         public Type VFSType = typeof(SystemVFS);
         public Type LoggerType = typeof(ConsoleLogger);
 
-        public string Authentication => UrlBase64.Encode(_sha256.ComputeHash(Encoding.UTF8.GetBytes(RemoteEndpoint.salt).Concat(SharedSecret).ToArray()));
+        public string Authentication => UrlBase64.Encode(SHA256.ComputeHash(Encoding.UTF8.GetBytes(RemoteEndpoint.salt).Concat(SharedSecret).ToArray()));
         public string CommunicationFormatUsed => (string.IsNullOrEmpty(CommunicationFormat) ? RemoteEndpoint.format : CommunicationFormat);
         public byte[] SharedSecret => string.IsNullOrEmpty(RemoteEndpoint.tempKey) ? new byte[0] : KeyPair.GenerateSharedSecret(RemoteEndpoint.tempKey);
-        public string DsId => Name + "-" + UrlBase64.Encode(_sha256.ComputeHash(KeyPair.EncodedPublicKey));
+        public string DsId => Name + "-" + KeyPair.GenerateIdSuffix();
         public bool HasToken => !string.IsNullOrEmpty(Token);
         public string TokenParameter => Connection.Token.CreateToken(Token, DsId);
         public IVFS VFS
@@ -68,7 +67,6 @@ namespace DSLink
         public Configuration(IEnumerable<string> args, string name, bool requester = false, bool responder = false)
         {
             _args = args;
-            _sha256 = new SHA256();
 
             Name = name;
             Requester = requester;

@@ -10,24 +10,24 @@ using Org.BouncyCastle.Security;
 namespace DSLink.Connection
 {
     /// <summary>
-    /// Handles key generation, loading, and saving for handshake.
+    /// Create and serialize/deserialize the prime256v1 curve that DSA uses.
     /// </summary>
     public class KeyPair
     {
         /// <summary>
         /// Key size.
         /// </summary>
-        public const int KeySize = 256;
+        private const int KeySize = 256;
 
         /// <summary>
         /// Curve type, prime256v1.
         /// </summary>
-        public const string Curve = "SECP256R1";
+        private const string Curve = "SECP256R1";
 
         /// <summary>
         /// BouncyCastle KeyPair.
         /// </summary>
-        public AsymmetricCipherKeyPair BcKeyPair;
+        private AsymmetricCipherKeyPair BcKeyPair;
 
         /// <summary>
         /// Gets the encoded public key.
@@ -99,6 +99,15 @@ namespace DSLink.Connection
             var bi = point.X.ToBigInteger();
 #pragma warning restore CS0618 // Type or member is obsolete
             return Normalize(bi.ToByteArray());
+        }
+
+        /// <summary>
+        /// Generate the suffix to a DsId.
+        /// </summary>
+        /// <returns>DsId suffix</returns>
+        public string GenerateIdSuffix()
+        {
+            return UrlBase64.Encode(SHA256.ComputeHash(EncodedPublicKey));
         }
 
         /// <summary>

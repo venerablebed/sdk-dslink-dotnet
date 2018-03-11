@@ -56,14 +56,28 @@ namespace DSLink.Connection
             }
             catch (Exception e)
             {
-                _link.Logger.Warning(e.Message);
+                _link.Logger.Error(e.Message);
             }
 
-            if (resp == null || !resp.IsSuccessStatusCode) return null;
+            if (resp == null)
+            {
+                _link.Logger.Error("Handshake returned null.");
+                return null;
+            }
             
+            _link.Logger.Debug("Handshake status code: " + resp.StatusCode.ToString());
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             _link.Logger.Info("Handshake successful");
+            var bodyString = await resp.Content.ReadAsStringAsync();
+            _link.Logger.Debug("Handshake response: " + bodyString);
+            
             return JsonConvert.DeserializeObject<RemoteEndpoint>(
-                await resp.Content.ReadAsStringAsync()
+                bodyString
             );
         }
 
@@ -89,7 +103,7 @@ namespace DSLink.Connection
                 {"isResponder", _link.Config.Responder},
                 {"linkData", new JObject()},
                 {"version", _dsaVersion},
-                {"formats", new JArray(Serializers.Types.Keys.ToArray())},
+                {"formats", new JArray(Serializers.Types.Keys.ToList())},
                 {"enableWebSocketCompression", _link.Connector.SupportsCompression}
             };
         }
