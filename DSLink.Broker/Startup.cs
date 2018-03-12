@@ -24,6 +24,16 @@ namespace DSLink.Broker
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
+            services.AddCors(options =>
+            {
+                options.AddPolicy("CorsPolicy", builder =>
+                {
+                    builder.AllowAnyOrigin();
+                    builder.AllowAnyMethod();
+                    builder.AllowAnyHeader();
+                    builder.AllowCredentials();
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -34,6 +44,7 @@ namespace DSLink.Broker
                 app.UseDeveloperExceptionPage();
             }
 
+            app.UseCors("CorsPolicy");
             app.UseMvc();
             app.UseWebSockets();
 
