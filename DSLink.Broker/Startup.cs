@@ -40,7 +40,7 @@ namespace DSLink.Broker
             app.Use(WebSocketEndpoint);
         }
 
-        private async Task WebSocketEndpoint(HttpContext context, Func<Task> next)
+        private static async Task WebSocketEndpoint(HttpContext context, Func<Task> next)
         {
             if (context.Request.Path == "/ws")
             {
@@ -60,7 +60,7 @@ namespace DSLink.Broker
                     }
                     else
                     {
-                        await HandleConnection(webSocket, link);
+                        await link.HandleConnection(webSocket);
                     }
                 }
                 else
@@ -72,35 +72,6 @@ namespace DSLink.Broker
             {
                 await next();
             }
-        }
-
-        private static async Task HandleConnection(WebSocket webSocket, ServerLink link)
-        {
-            var buffer = new byte[1024 * 4];
-            var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-
-            while (!result.CloseStatus.HasValue)
-            {
-                switch (result.MessageType)
-                {
-                    case WebSocketMessageType.Text:
-                        link.ReceiveStringMessage(Encoding.UTF8.GetString(buffer));
-                        break;
-                    case WebSocketMessageType.Binary:
-                        link.ReceiveBinaryMessage(buffer);
-                        break;
-                    case WebSocketMessageType.Close:
-                        await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription,
-                            CancellationToken.None);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-
-                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            }
-
-            await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
         }
     }
 }

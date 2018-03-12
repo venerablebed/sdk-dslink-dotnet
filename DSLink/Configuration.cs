@@ -105,13 +105,16 @@ namespace DSLink
             var options = new OptionSet
             {
                 {
-                    "broker=", val => { BrokerUrl = val; }
+                    "broker=", val => BrokerUrl = val
                 },
                 {
-                    "token=", val => { Token = val; }
+                    "token=", val => Token = val
                 },
                 {
                     "log=", val => { LogLevel = LogLevel.ParseLogLevel(val); }
+                },
+                {
+                    "format=", val => CommunicationFormat = val
                 }
             };
             options.Parse(_args);

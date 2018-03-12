@@ -13,12 +13,11 @@ namespace DSLink.Broker.Controllers
         [HttpGet]
         public string Get()
         {
-            return "/conn is not meant to be loaded in a browser";
+            return "/conn is used with a POST, see https://github.com/IOT-DSA/docs/wiki/Protocol-Communication";
         }
 
         [HttpPost]
-        public ConnResponseObject Post([FromQuery(Name = "dsId")] string dsId,
-            [FromQuery(Name = "token")] string token)
+        public ConnResponseObject Post([FromQuery(Name = "dsId")] string dsId, [FromQuery(Name = "token")] string token)
         {
             var bodyReader = new StreamReader(Request.Body);
             var body = bodyReader.ReadToEnd();
@@ -62,7 +61,7 @@ namespace DSLink.Broker.Controllers
                 Program.Broker.ConnectionHandler.AddLink(link);
             }
             
-            link.SetRequestObject(requestObject);
+            link.RequestObject = requestObject;
             return Program.Broker.ConnectionHandler.InitLink(link);
             
             error:

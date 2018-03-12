@@ -5,12 +5,13 @@ using DSLink.Logger;
 using Newtonsoft.Json.Linq;
 using DSLink.Request;
 using DSLink.Respond;
+using DSLink.Util;
 
 namespace DSLink
 {
     public class DSLinkContainer
     {
-        private Task _pingTask;
+        private readonly PeriodicTask _pingPeriodicTask;
         private Handshake _handshake;
         private bool _reconnectOnFailure;
         private bool _isLinkInitialized;
@@ -28,6 +29,7 @@ namespace DSLink
 
         public DSLinkContainer(Configuration config)
         {
+            _pingPeriodicTask = new PeriodicTask(OnPingTaskElapsed, 30000);
             _config = config;
             _config._processOptions();
             _logger = new ConsoleLogger("DSLink", config.LogLevel);
@@ -72,7 +74,6 @@ namespace DSLink
             _isLinkInitialized = true;
 
             await _config._initKeyPair();
-            _pingTask = Task.Factory.StartNew(OnPingTaskElapsed);
 
             if (Config.Responder)
             {
@@ -160,11 +161,13 @@ namespace DSLink
 
         private async void OnOpen()
         {
+            _pingPeriodicTask.Start();
             await Connector.Flush();
         }
 
         private async void OnClose()
         {
+            _pingPeriodicTask.Stop();
             if (Responder != null)
             {
                 Responder.SubscriptionManager.ClearAll();
@@ -283,16 +286,10 @@ namespace DSLink
 
         private async void OnPingTaskElapsed()
         {
-            while (_pingTask.Status != TaskStatus.Canceled)
+            if (Connector.Connected())
             {
-                if (Connector.Connected())
-                {
-                    // Write a blank message containing no responses/requests.
-                    await Connector.Write(new JObject(), false);
-                }
-                
-                // Delay thirty seconds until the next ping.
-                await Task.Delay(30000);
+                // Write a blank message containing no responses/requests.
+                await Connector.Write(new JObject(), false);
             }
         }
     }
