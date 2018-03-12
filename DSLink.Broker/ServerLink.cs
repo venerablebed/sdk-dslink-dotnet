@@ -30,6 +30,16 @@ namespace DSLink.Broker
             TempKey = new KeyPair();
         }
 
+        public void ReceiveStringMessage(string str)
+        {
+            Console.WriteLine(str);
+        }
+
+        public void ReceiveBinaryMessage(byte[] bytes)
+        {
+            Console.WriteLine(BitConverter.ToString(bytes));
+        }
+
         public void SetRequestObject(ConnRequestObject requestObject)
         {
             _requestObject = requestObject;
