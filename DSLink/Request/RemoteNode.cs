@@ -1,11 +1,12 @@
 using System;
+using DSLink.Nodes;
 using Newtonsoft.Json.Linq;
 
-namespace DSLink.Nodes
+namespace DSLink.Request
 {
     /// <inheritdoc />
     /// <summary>
-    /// Represents a remote Node that isn't on our Node tree.
+    /// Represents a remote Node that was created from the requester.
     /// </summary>
     public class RemoteNode : Node
     {
@@ -14,33 +15,26 @@ namespace DSLink.Nodes
             Path = path;
         }
 
-        /// <summary>
-        /// <see cref="Node"/>
-        /// </summary>
+        /// <inheritdoc />
         public override NodeFactory CreateChild(string name)
         {
             throw new InvalidOperationException("Cannot create a remote node");
         }
 
         /// <summary>
-        /// Set the value.
+        /// Override to prevent unwanted behavior.
         /// </summary>
-        /// <param name="value">Value</param>
         protected override void ValueSet(Value value)
         {
         }
 
         /// <summary>
-        /// Updates the subscribers.
+        /// Override to prevent unwanted behavior.
         /// </summary>
         protected override void UpdateSubscribers()
         {
         }
 
-        /// <summary>
-        /// Deserializes.
-        /// </summary>
-        /// <param name="serialized">Serialized</param>
         public void FromSerialized(JArray serialized)
         {
             foreach (var jToken in serialized)
@@ -72,8 +66,7 @@ namespace DSLink.Nodes
                 else
                 {
                     var child = new RemoteNode(key, this, Path + "/" + key);
-                    var jObject = value as JObject;
-                    if (jObject != null)
+                    if (value is JObject jObject)
                     {
                         foreach (var kp in jObject)
                         {
