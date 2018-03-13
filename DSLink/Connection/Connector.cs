@@ -15,7 +15,7 @@ namespace DSLink.Connection
         private readonly Configuration _config;
         private readonly IncrementingIndex _msgId;
 
-        public BaseSerializer DataSerializer { get; private set; }
+        public virtual BaseSerializer DataSerializer { get; private set; }
 
         public ConnectionState ConnectionState
         {

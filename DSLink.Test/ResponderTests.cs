@@ -4,11 +4,11 @@ using DSLink.Respond;
 using Moq;
 using NUnit.Framework;
 using System.Collections.Generic;
-using StandardStorage;
 using Newtonsoft.Json.Linq;
 using DSLink.Nodes;
 using System.Threading.Tasks;
 using DSLink.Nodes.Actions;
+using DSLink.Serializer;
 
 namespace DSLink.Test
 {
@@ -17,6 +17,7 @@ namespace DSLink.Test
     {
         private Configuration _config;
         private DSLinkResponder _responder;
+        private JsonSerializer _jsonSerializer;
         private Mock<DSLinkContainer> _mockContainer;
         private Mock<Connector> _mockConnector;
 
@@ -25,6 +26,7 @@ namespace DSLink.Test
         {
             _config = new Configuration(new List<string>(), "Test", responder: true);
             _config.KeyPair.Generate();
+            _jsonSerializer = new JsonSerializer();
 
             _mockContainer = new Mock<DSLinkContainer>(_config);
             _mockConnector = new Mock<Connector>(
@@ -32,6 +34,7 @@ namespace DSLink.Test
             );
 
             _mockContainer.SetupGet(c => c.Connector).Returns(_mockConnector.Object);
+            _mockConnector.SetupGet(c => c.DataSerializer).Returns(_jsonSerializer);
 
             _responder = new DSLinkResponder(_mockContainer.Object);
             _mockContainer.SetupGet(c => c.Responder).Returns(_responder);
@@ -170,7 +173,7 @@ namespace DSLink.Test
         [Test]
         public async Task Invoke()
         {
-            bool actionInvoked = false;
+            var actionInvoked = false;
             _responder.SuperRoot.CreateChild("testAction")
                 .SetInvokable(Permission.Write)
                 .SetAction(new ActionHandler(Permission.Write, async (request) =>
