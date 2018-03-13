@@ -8,6 +8,8 @@ namespace DSLink.Respond
 {
     public class DiskSerializer
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         private readonly Responder _responder;
 
         public DiskSerializer(Responder responder)
@@ -35,9 +37,9 @@ namespace DSLink.Respond
                     await streamWriter.WriteAsync(data).ConfigureAwait(false);
                 }
 
-                if (_responder.Link.Config.LogLevel.DoesPrint(LogLevel.Debug))
+                if (GlobalConfiguration.LogLevel.DoesPrint(LogLevel.Debug))
                 {
-                    _responder.Link.Logger.Debug($"Wrote {data} to nodes.json");
+                    Log.Debug($"Wrote {data} to nodes.json");
                 }
             }
         }
@@ -64,9 +66,9 @@ namespace DSLink.Respond
             }
             catch (Exception e)
             {
-                _responder.Link.Logger.Warning("Failed to load nodes.json");
-                _responder.Link.Logger.Warning(e.Message);
-                _responder.Link.Logger.Warning(e.StackTrace);
+                Log.Warning("Failed to load nodes.json");
+                Log.Warning(e.Message);
+                Log.Warning(e.StackTrace);
                 _responder.SuperRoot.ResetNode();
             }
 

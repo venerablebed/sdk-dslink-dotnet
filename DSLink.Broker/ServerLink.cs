@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using DSLink.Util;
 using DSLink.Broker.Objects;
 using DSLink.Connection;
+using DSLink.Respond;
+using DSLink.Serializer;
 using Newtonsoft.Json.Linq;
 
 namespace DSLink.Broker
@@ -15,6 +17,7 @@ namespace DSLink.Broker
         private static readonly Random Random = new Random();
         private readonly PeriodicTask _pingPeriodicTask;
         private readonly IncrementingIndex _msg = new IncrementingIndex();
+        private BaseSerializer _serializer;
         private WebSocket _webSocket;
         
         public readonly string DsId;
@@ -45,12 +48,65 @@ namespace DSLink.Broker
 
         private void _recvStringMessage(string str)
         {
-            Console.WriteLine(str);
+            _handleIncomingObject(_serializer.Deserialize(str));
         }
 
         private void _recvBinaryMessage(byte[] bytes)
         {
-            Console.WriteLine(BitConverter.ToString(bytes));
+            _handleIncomingObject(_serializer.Deserialize(bytes));
+        }
+
+        private void _handleIncomingObject(JObject obj)
+        {
+            Console.WriteLine(obj.ToString());
+            var outgoingResponses = new JArray();
+            var respObject = new JObject
+            {
+                new JProperty("responses", outgoingResponses),
+                new JProperty("requests", outgoingResponses)
+            };
+            var sendAck = false;
+            
+            if (obj.ContainsKey("responses"))
+            {
+                sendAck = true;
+            }
+
+            if (obj.ContainsKey("requests"))
+            {
+                var requests = obj["requests"];
+
+                foreach (var request in requests)
+                {
+                    var method = request["method"].Value<string>();
+                    var rid = request["rid"].Value<int>();
+
+                    switch (method)
+                    {
+                        case "list":
+                            var path = request["path"];
+                            var node = Program.Broker.RootNode.Get(path.Value<string>());
+                            if (node != null)
+                            {
+                                outgoingResponses.Add(new JObject
+                                {
+                                    new JProperty("rid", rid),
+                                    new JProperty("stream", "open"),
+                                    new JProperty("updates", SubscriptionManager.SerializeUpdates(node))
+                                });
+                            }
+                            break;
+                    }
+                }
+                
+                sendAck = true;
+            }
+
+            if (sendAck && obj.ContainsKey("msg"))
+            {
+                respObject["ack"] = obj["msg"];
+            }
+            _sendObject(respObject);
         }
 
         private Task _send(string data)
@@ -84,6 +140,23 @@ namespace DSLink.Broker
         private void _pingElapsed()
         {
             _sendObject(new JObject());
+        }
+
+        public void InitSerializer(string format)
+        {
+            switch (format)
+            {
+                case "json":
+                    _serializer = new JsonSerializer();
+                    break;
+                case "msgpack":
+                    _serializer = new MsgPackSerializer();
+                    break;
+                default:
+                    Console.WriteLine("Warning: unknown format: " + format);
+                    _serializer = new JsonSerializer();
+                    break;
+            }
         }
 
         public async Task HandleConnection(WebSocket webSocket)

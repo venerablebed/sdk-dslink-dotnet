@@ -2,11 +2,14 @@
 using DSLink.Nodes;
 using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
+using DSLink.Logger;
 
 namespace DSLink.Respond
 {
     public class SubscriptionManager
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         private readonly Dictionary<int, Node> _subscriptionToNode;
         private readonly DSLinkContainer _link;
 
@@ -37,7 +40,7 @@ namespace DSLink.Respond
             }
             catch (KeyNotFoundException)
             {
-                _link.Logger.Debug($"Failed to Unsubscribe: unknown subscription id {sid}");
+                Log.Debug($"Failed to Unsubscribe: unknown subscription id {sid}");
             }
         }
 
@@ -70,7 +73,7 @@ namespace DSLink.Respond
             }
         }
 
-        public JArray SerializeUpdates(Node node)
+        public static JArray SerializeUpdates(Node node)
         {
             var updates = new JArray();
 
@@ -109,7 +112,7 @@ namespace DSLink.Respond
 
             lock (node.RemovedChildren)
             {
-                foreach (Node removedChild in node.RemovedChildren)
+                foreach (var removedChild in node.RemovedChildren)
                 {
                     updates.Add(new JObject
                     {

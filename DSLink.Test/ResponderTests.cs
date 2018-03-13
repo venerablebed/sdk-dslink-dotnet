@@ -1,4 +1,5 @@
-﻿using DSLink.Connection;
+﻿using System;
+using DSLink.Connection;
 using DSLink.Respond;
 using Moq;
 using NUnit.Framework;
@@ -16,22 +17,18 @@ namespace DSLink.Test
     {
         private Configuration _config;
         private DSLinkResponder _responder;
-        private Mock<IFolder> _mockFolder;
         private Mock<DSLinkContainer> _mockContainer;
-        private Mock<SubscriptionManager> _mockSubManager;
         private Mock<Connector> _mockConnector;
 
         [SetUp]
         public void SetUp()
         {
-            _mockFolder = new Mock<IFolder>();
-
             _config = new Configuration(new List<string>(), "Test", responder: true);
+            _config.KeyPair.Generate();
 
-            _mockContainer = new Mock<DSLinkContainer>(new Configuration(new List<string>(), "Test"));
+            _mockContainer = new Mock<DSLinkContainer>(_config);
             _mockConnector = new Mock<Connector>(
-                _mockContainer.Object.Config,
-                _mockContainer.Object.Logger
+                _mockContainer.Object.Config
             );
 
             _mockContainer.SetupGet(c => c.Connector).Returns(_mockConnector.Object);
@@ -139,14 +136,17 @@ namespace DSLink.Test
             Assert.AreEqual(1, response["rid"].Value<int>());
             Assert.AreEqual("open", response["stream"].Value<string>());
 
+            Console.WriteLine(updates[0].ToString());
             Assert.IsTrue(JToken.DeepEquals(updates[0], new JArray
             {
                 "$is",
-                "node"
+                "dsa/link"
             }));
+            
+            // TODO: Test dsId value
 
-            var testValueUpdate = updates[1][1];
-            Assert.AreEqual("testValue", updates[1][0].Value<string>());
+            var testValueUpdate = updates[2][1];
+            Assert.AreEqual("testValue", updates[2][0].Value<string>());
             Assert.NotNull(testValueUpdate["$is"]);
             Assert.NotNull(testValueUpdate["$type"]);
             Assert.NotNull(testValueUpdate["value"]);
@@ -156,8 +156,8 @@ namespace DSLink.Test
             Assert.AreEqual(123, testValueUpdate["value"].Value<int>());
             Assert.AreEqual(JTokenType.String, testValueUpdate["ts"].Type);
 
-            var testNodeUpdate = updates[2][1];
-            Assert.AreEqual("testNodeConfigs", updates[2][0].Value<string>());
+            var testNodeUpdate = updates[3][1];
+            Assert.AreEqual("testNodeConfigs", updates[3][0].Value<string>());
             Assert.NotNull(testNodeUpdate["$is"]);
             Assert.NotNull(testNodeUpdate["$testString"]);
             Assert.NotNull(testNodeUpdate["$testNumber"]);

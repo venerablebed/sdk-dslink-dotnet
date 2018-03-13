@@ -8,7 +8,8 @@ using Newtonsoft.Json.Linq;
 namespace DSLink.Nodes
 {
     /// <summary>
-    /// A DSA Node
+    /// Represents a Node on the DSA structure.
+    /// https://github.com/IOT-DSA/docs/wiki/Node-API
     /// </summary>
     public class Node
     {
@@ -19,9 +20,7 @@ namespace DSLink.Nodes
             '%', '.', '/', '\\', '?', '*', ':', '|', '<', '>', '$', '@', ',', '\'', '"'
         };
 
-        private readonly DSLinkContainer _link;
-        private string _path;
-        private readonly IDictionary<string, Node> _children;
+        internal readonly IDictionary<string, Node> _children;
         internal readonly List<Node> _removedChildren;
         internal readonly List<int> _subscribers;
         internal readonly List<int> _streams;
@@ -32,29 +31,36 @@ namespace DSLink.Nodes
         public readonly string Name;
 
         /// <summary>
+        /// Path of this Node.
+        /// </summary>
+        public string Path
+        {
+            get;
+            protected set;
+        }
+
+        /// <summary>
         /// Parent of this Node.
         /// </summary>
         public readonly Node Parent;
+        
+        /// <summary>
+        /// Traverse to the highest Node in this tree.
+        /// </summary>
+        /// <returns>Root Node of this tree</returns>
+        public SuperRootNode Root
+        {
+            get
+            {
+                var root = Parent == null ? this : Parent.Root;
+                return root is SuperRootNode ? (SuperRootNode) root : null;
+            }
+        }
 
         /// <summary>
         /// Value of this Node.
         /// </summary>
         public readonly Value Value;
-
-        /// <summary>
-        /// Path of this Node.
-        /// </summary>
-        public string Path
-        {
-            get
-            {
-                return _path;
-            }
-            protected set
-            {
-                _path = value.TrimEnd('/');
-            }
-        }
 
         /// <summary>
         /// Class for manipulating configs.
@@ -88,7 +94,7 @@ namespace DSLink.Nodes
         public ActionHandler ActionHandler
         {
             get;
-            protected set;
+            private set;
         }
 
         /// <summary>
@@ -139,9 +145,17 @@ namespace DSLink.Nodes
 
         /// <summary>
         /// Index operator overload.
-        /// Example: Parent["Child"]["ChildOfChild"]
         /// </summary>
-        /// <param name="name">Child name</param>
+        /// <example>
+        /// Names:
+        /// Parent["Child"]["ChildOfChild"]
+        ///   Returns /ThisNode/Child/ChildOfChild
+        /// 
+        /// Relative path:
+        /// Parent["/Child/ChildOfChild"]
+        ///   Returns /ThisNode/Child/ChildOfChild
+        /// </example>
+        /// <param name="name">Child name or relative path</param>
         /// <returns>Child Node</returns>
         public Node this[string name]
         {
@@ -149,11 +163,7 @@ namespace DSLink.Nodes
             {
                 lock (_children)
                 {
-                    if (name.StartsWith("/"))
-                    {
-                        return Get(name);
-                    }
-                    return _children[name];
+                    return name.StartsWith("/") ? Get(name) : _children[name];
                 }
             }
         }
@@ -163,13 +173,12 @@ namespace DSLink.Nodes
         /// </summary>
         /// <param name="name">Name of Node</param>
         /// <param name="parent">Parent of Node</param>
-        /// <param name="link">DSLink container of Node</param>
         /// <param name="className">Node class name</param>
-        public Node(string name, Node parent, DSLinkContainer link, string className = "node")
+        public Node(string name, Node parent, string className = "node")
         {
             if (name == null)
             {
-                throw new ArgumentException("Name must not be null.");
+                throw new ArgumentException("Name cannot be null");
             }
             ClassName = className;
             Parent = parent;
@@ -185,7 +194,6 @@ namespace DSLink.Nodes
             _removedChildren = new List<Node>();
             _subscribers = new List<int>();
             _streams = new List<int>();
-            _link = link;
 
             _createInitialData();
 
@@ -207,7 +215,7 @@ namespace DSLink.Nodes
                 Path = "/" + name;
             }
 
-            link?.Responder?.StreamManager?.OnActivateNode(this);
+            Root?.Link?.Responder.StreamManager.OnActivateNode(this);
         }
 
         private void _createInitialData()
@@ -220,18 +228,16 @@ namespace DSLink.Nodes
         /// </summary>
         public void InitializeClass()
         {
-            if (_initializedClass || _link == null)
+            if (_initializedClass || Root == null)
             {
                 return;
             }
             _initializedClass = true;
-            if (_link.Responder.NodeClasses.ContainsKey(ClassName) &&
-                (!PrivateConfigs.Has("nodeClassInit") || PrivateConfigs.Get("nodeClassInit").Boolean == false))
-            {
-                PrivateConfigs.Set("nodeClassInit", new Value(true));
-                ResetNode();
-                _link.Responder.NodeClasses[ClassName](this);
-            }
+            if (!Root.Link.Responder.NodeClasses.ContainsKey(ClassName) ||
+                (PrivateConfigs.Has("nodeClassInit") && PrivateConfigs.Get("nodeClassInit").Boolean)) return;
+            PrivateConfigs.Set("nodeClassInit", new Value(true));
+            ResetNode();
+            Root.Link.Responder.NodeClasses[ClassName](this);
         }
 
         /// <summary>
@@ -242,7 +248,10 @@ namespace DSLink.Nodes
         /// </summary>
         internal void ResetNode()
         {
-            _children.Clear();
+            lock (_children)
+            {
+                _children.Clear();
+            }
             Configs.Clear();
             Attributes.Clear();
             PrivateConfigs.Clear();
@@ -269,7 +278,7 @@ namespace DSLink.Nodes
             {
                 throw new ArgumentException("Invalid character(s) in Node name.");
             }
-            Node child = new Node(name, this, _link, className);
+            var child = new Node(name, this, className);
             return new NodeFactory(child);
         }
 
@@ -312,11 +321,11 @@ namespace DSLink.Nodes
                 Configs.Set(ConfigType.Parameters, new Value(new JArray()));
             }
             var parameters = Configs.Get(ConfigType.Parameters).JArray;
-            foreach (JToken token in parameters)
+            foreach (var token in parameters)
             {
                 if (token["name"].Value<string>() == parameter.Name)
                 {
-                    throw new Exception($"Parameter {parameter.Name} already exists on {_path}");
+                    throw new Exception($"Parameter {parameter.Name} already exists on {Path}");
                 }
             }
             parameters.Add(parameter);
@@ -333,11 +342,11 @@ namespace DSLink.Nodes
                 Configs.Set(ConfigType.Columns, new Value(new JArray()));
             }
             var columns = Configs.Get(ConfigType.Columns).JArray;
-            foreach (JToken token in columns)
+            foreach (var token in columns)
             {
                 if (token["name"].Value<string>() == column.Name)
                 {
-                    throw new Exception($"Column {column.Name} already exists on {_path}");
+                    throw new Exception($"Column {column.Name} already exists on {Path}");
                 }
             }
             columns.Add(column);
@@ -402,13 +411,13 @@ namespace DSLink.Nodes
         /// <param name="value"></param>
         protected virtual async void ValueSet(Value value)
         {
-            List<Task> tasks = new List<Task>();
+            var tasks = new List<Task>();
 
             lock (_subscribers)
             {
                 foreach (var sid in _subscribers)
                 {
-                    tasks.Add(_link.Connector.AddValueUpdateResponse(new JArray
+                    tasks.Add(Root.Link.Connector.AddValueUpdateResponse(new JArray
                     {
                         sid,
                         value.JToken,
@@ -530,13 +539,18 @@ namespace DSLink.Nodes
             {
                 return this;
             }
+            
             path = path.TrimStart('/');
             var indexOfFirstSlash = path.IndexOf('/');
             var child = indexOfFirstSlash == -1 ? path : path.Substring(0, path.IndexOf('/'));
             path = path.TrimStart(child.ToCharArray());
+            
             try
             {
-                return Children[child].Get(path);
+                lock (_children)
+                {
+                    return _children[child].Get(path);
+                }
             }
             catch (KeyNotFoundException)
             {
@@ -550,15 +564,28 @@ namespace DSLink.Nodes
         /// <returns>A new Node instance that is exactly the same as this node.</returns>
         public Node Clone()
         {
-            var node = new Node(Name, Parent, _link, Configs.Get(ConfigType.ClassName).String);
+            var node = new Node(Name, Parent, Configs.Get(ConfigType.ClassName).String);
             node.Deserialize(node.Serialize());
             return node;
         }
 
         protected virtual async void UpdateSubscribers()
         {
-            if (_link == null) return;
-            await _link.Responder.SubscriptionManager.UpdateSubscribers(this);
+            if (Root?.Link != null)
+            {
+                await Root.Link.Responder.SubscriptionManager.UpdateSubscribers(this);
+            }
+        }
+    }
+
+    public class SuperRootNode : Node
+    {
+        public readonly DSLinkContainer Link;
+        
+        public SuperRootNode(DSLinkContainer link, string name, Node parent, string className = "node")
+            : base(name, parent, className)
+        {
+            Link = link;
         }
     }
 }

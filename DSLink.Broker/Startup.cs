@@ -71,6 +71,7 @@ namespace DSLink.Broker
                     }
                     else
                     {
+                        link.InitSerializer(format);
                         await link.HandleConnection(webSocket);
                     }
                 }

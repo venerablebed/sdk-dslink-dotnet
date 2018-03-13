@@ -1,10 +1,13 @@
 ﻿using System.Collections.Generic;
+using DSLink.Logger;
 using DSLink.Nodes;
 
 namespace DSLink.Respond
 {
     public class StreamManager
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         private readonly Dictionary<int, string> _requestIdToPath = new Dictionary<int, string>();
         private readonly DSLinkContainer _link;
 
@@ -43,7 +46,7 @@ namespace DSLink.Respond
             }
             catch (KeyNotFoundException)
             {
-                _link.Logger.Debug($"Failed to Close: unknown request id or node for {requestId}");
+                Log.Debug($"Failed to Close: unknown request id or node for {requestId}");
             }
         }
 
@@ -52,12 +55,10 @@ namespace DSLink.Respond
             foreach (var id in _requestIdToPath.Keys)
             {
                 var path = _requestIdToPath[id];
-                if (path == node.Path)
+                if (path != node.Path) continue;
+                lock (node._streams)
                 {
-                    lock (node._streams)
-                    {
-                        node._streams.Add(id);
-                    }
+                    node._streams.Add(id);
                 }
             }
         }

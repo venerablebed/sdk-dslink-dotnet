@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using DSLink.Logger;
 using Newtonsoft.Json.Linq;
 using DSLink.Util;
 
@@ -8,6 +9,8 @@ namespace DSLink.Request
 {
     public class RemoteSubscriptionManager
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         private readonly DSLinkContainer _link;
         private readonly Dictionary<string, Subscription> _subscriptions;
         private readonly Dictionary<int, string> _subIdToPath;
@@ -26,7 +29,7 @@ namespace DSLink.Request
         public async Task<int> Subscribe(string path, Action<SubscriptionUpdate> callback, int qos)
         {
             var sid = _subscriptionId.Next;
-            var request = new SubscribeRequest(_link.Requester._requestId.Next, new JArray
+            var request = new SubscribeRequest(_link.Requester.RequestId.Next, new JArray
             {
                 new JObject
                 {
@@ -66,7 +69,7 @@ namespace DSLink.Request
                     new JProperty("requests", new JArray
                     {
                         new UnsubscribeRequest(
-                            _link.Requester._requestId.Next,
+                            _link.Requester.RequestId.Next,
                             new JArray
                             {
                                 sub.RealSubID
@@ -99,7 +102,7 @@ namespace DSLink.Request
         {
             if (!_realSubIdToPath.ContainsKey(subId))
             {
-                _link.Logger.Debug(string.Format("Remote sid {0} was not found in subscription manager", subId));
+                Log.Debug(string.Format("Remote sid {0} was not found in subscription manager", subId));
                 return;
             }
             foreach (var i in _subscriptions[_realSubIdToPath[subId]].VirtualSubs)

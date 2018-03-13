@@ -11,6 +11,8 @@ namespace DSLink
 {
     public class DSLinkContainer
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         private readonly PeriodicTask _pingPeriodicTask;
         private Handshake _handshake;
         private bool _reconnectOnFailure;
@@ -19,33 +21,27 @@ namespace DSLink
         private readonly DSLinkResponder _responder;
         private readonly DSLinkRequester _requester;
         private readonly Connector _connector;
-        private readonly BaseLogger _logger;
 
         public Configuration Config => _config;
         public virtual Responder Responder => _responder;
         public virtual DSLinkRequester Requester => _requester;
         public virtual Connector Connector => _connector;
-        public virtual BaseLogger Logger => _logger;
 
         public DSLinkContainer(Configuration config)
         {
             _pingPeriodicTask = new PeriodicTask(OnPingTaskElapsed, 30000);
             _config = config;
             _config._processOptions();
-            _logger = new ConsoleLogger("DSLink", config.LogLevel);
-            _logger = (BaseLogger)Activator.CreateInstance(_config.LoggerType, "DSLink", _config.LogLevel);
             _reconnectOnFailure = true;
-            _connector = new WebSocketConnector(_config, _logger);
+            _connector = new WebSocketConnector(_config);
 
             if (Config.Responder)
             {
                 _responder = new DSLinkResponder(this);
-                _responder.Init();
             }
             if (Config.Requester)
             {
                 _requester = new DSLinkRequester(this);
-                _requester.Init();
             }
 
             // Connector events
@@ -72,8 +68,11 @@ namespace DSLink
                 return;
             }
             _isLinkInitialized = true;
-
+            
             await _config._initKeyPair();
+
+            _responder?.Init();
+            _requester?.Init();
 
             if (Config.Responder)
             {
@@ -119,7 +118,7 @@ namespace DSLink
                 {
                     delay = Config.MaxConnectionCooldown;
                 }
-                _logger.Warning($"Failed to connect, delaying for {delay} seconds");
+                Log.Warning($"Failed to connect, delaying for {delay} seconds");
                 await Task.Delay(TimeSpan.FromSeconds(delay));
 
                 if (attemptsLeft > 0)
@@ -128,7 +127,7 @@ namespace DSLink
                 }
                 attempts++;
             }
-            _logger.Warning("Failed to connect within the allotted connection attempt limit.");
+            Log.Warning("Failed to connect within the allotted connection attempt limit.");
             OnConnectionFailed();
             return ConnectionState.Disconnected;
         }
@@ -258,17 +257,17 @@ namespace DSLink
 
         private void LogMessageString(bool sent, MessageEvent messageEvent)
         {
-            if (_logger.ToPrint.DoesPrint(LogLevel.Debug))
+            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
             {
                 var verb = sent ? "Sent" : "Received";
                 var logString = $"Text {verb}: {messageEvent.Message}";
-                _logger.Debug(logString);
+                Log.Debug(logString);
             }
         }
 
         private void LogMessageBytes(bool sent, BinaryMessageEvent messageEvent)
         {
-            if (_logger.ToPrint.DoesPrint(LogLevel.Debug))
+            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
             {
                 var verb = sent ? "Sent" : "Received";
                 var logString = $"Binary {verb}: ";
@@ -280,7 +279,7 @@ namespace DSLink
                 {
                     logString += "(over 5000 bytes)";
                 }
-                _logger.Debug(logString);
+                Log.Debug(logString);
             }
         }
 

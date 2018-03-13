@@ -3,25 +3,31 @@
 namespace DSLink.Logger
 {
     /// <summary>
-    /// Default logger for platforms that support using System.Console.WriteLine.
+    /// Standard logger for platforms that support using Console and Console.Error.
     /// </summary>
+    /// <inheritdoc />
     public class ConsoleLogger : BaseLogger
     {
-        public ConsoleLogger(string name, LogLevel toPrint) : base(name, toPrint)
+        public ConsoleLogger(LogLevel toPrint) : base(toPrint)
         {
         }
 
         /// <summary>
         /// Prints a message to the console.
         /// </summary>
-        /// <param name="logLevel">Log level</param>
-        /// <param name="message">Message</param>
-        public override void Print(LogLevel logLevel, string message)
+        /// <param name="message">Message to write to console</param>
+        protected override void Print(string message)
         {
-            if (logLevel.DoesPrint(ToPrint))
-            {
-                Console.WriteLine(Format(logLevel, message));
-            }
+            Console.WriteLine(message);
+        }
+
+        /// <summary>
+        /// Prints an error message to the console.
+        /// </summary>
+        /// <param name="message">Message to write to console</param>
+        protected override void PrintError(string message)
+        {
+            Console.Error.WriteLine(message);
         }
     }
 }

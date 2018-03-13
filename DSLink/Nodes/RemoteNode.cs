@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 
 namespace DSLink.Nodes
 {
+    /// <inheritdoc />
     /// <summary>
     /// Represents a remote Node that isn't on our Node tree.
     /// </summary>

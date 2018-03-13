@@ -8,7 +8,7 @@ namespace DSLink.Respond
 {
     public class DSLinkResponder : Responder
     {
-        public DSLinkResponder(DSLinkContainer link) : base()
+        public DSLinkResponder(DSLinkContainer link)
         {
             Link = link;
         }
@@ -18,7 +18,9 @@ namespace DSLink.Respond
             DiskSerializer = new DiskSerializer(this);
             SubscriptionManager = new SubscriptionManager(Link);
             StreamManager = new StreamManager(Link);
-            SuperRoot = new Node("", null, Link);
+            SuperRoot = new SuperRootNode(Link, "", null);
+            SuperRoot.Configs.Set("is", new Value("dsa/link"));
+            SuperRoot.Configs.Set("$dsId", new Value(Link.Config.DsId));
         }
 
         public override void AddNodeClass(string name, Action<Node> factory)

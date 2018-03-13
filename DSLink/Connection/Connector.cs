@@ -10,12 +10,12 @@ namespace DSLink.Connection
 {
     public abstract class Connector
     {
-        private BaseSerializer _serializer;
-        protected readonly BaseLogger _logger;
-        protected readonly Configuration _config;
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+
+        private readonly Configuration _config;
         private readonly IncrementingIndex _msgId;
 
-        public BaseSerializer DataSerializer => _serializer;
+        public BaseSerializer DataSerializer { get; private set; }
 
         public ConnectionState ConnectionState
         {
@@ -60,9 +60,9 @@ namespace DSLink.Connection
                 _enableQueue = value;
                 if (!value)
                 {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+#pragma warning disable CS4014
                     Flush();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+#pragma warning restore CS4014
                 }
             }
             get
@@ -112,23 +112,22 @@ namespace DSLink.Connection
         /// </summary>
         public event Action<BinaryMessageEvent> OnBinaryMessage;
 
-        protected Connector(Configuration config, BaseLogger logger)
+        protected Connector(Configuration config)
         {
             _config = config;
-            _logger = logger;
             ConnectionState = ConnectionState.Disconnected;
             _msgId = new IncrementingIndex();
 
             OnOpen += () =>
             {
                 ConnectionState = ConnectionState.Connected;
-                _logger.Info($"Connected to {WsUrl}");
+                Log.Info($"Connected");
             };
 
             OnClose += () =>
             {
                 ConnectionState = ConnectionState.Disconnected;
-                _logger.Info("Disconnected");
+                Log.Info("Disconnected");
             };
         }
 
@@ -162,11 +161,11 @@ namespace DSLink.Connection
         /// </summary>
         public virtual Task Connect()
         {
-            _serializer = (BaseSerializer) Activator.CreateInstance(
+            DataSerializer = (BaseSerializer) Activator.CreateInstance(
                 Serializers.Types[_config.CommunicationFormatUsed]
             );
             ConnectionState = ConnectionState.Connecting;
-            _logger.Info("Connecting");
+            Log.Info("Connecting");
 
             return Task.CompletedTask;
         }
@@ -177,7 +176,7 @@ namespace DSLink.Connection
         public virtual Task Disconnect()
         {
             ConnectionState = ConnectionState.Disconnecting;
-            _logger.Info("Disconnecting");
+            Log.Info("Disconnecting");
 
             return Task.CompletedTask;
         }
@@ -361,8 +360,8 @@ namespace DSLink.Connection
             {
                 return;
             }
-            _logger.Debug("Flushing connection message queue");
-            JObject _queueToFlush = null;
+            Log.Debug("Flushing connection message queue");
+            JObject queueToFlush = null;
             lock (_queueLock)
             {
                 if (fromEvent)
@@ -391,7 +390,7 @@ namespace DSLink.Connection
 
                 if (_queue != null)
                 {
-                    _queueToFlush = _queue;
+                    queueToFlush = _queue;
                     _queue = null;
                 }
 
@@ -400,9 +399,9 @@ namespace DSLink.Connection
                     _subscriptionValueQueue = new JArray();
                 }
             }
-            if (_queueToFlush != null)
+            if (queueToFlush != null)
             {
-                await Write(_queueToFlush, false);
+                await Write(queueToFlush, false);
             }
         }
 

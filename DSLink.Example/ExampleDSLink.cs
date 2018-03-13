@@ -80,8 +80,8 @@ namespace DSLink.Example
                     kv.Value.Set(_random.Next());
                 }
             }
-            await Task.Delay(1);
-            _updateRandomNumbers();
+            //await Task.Delay(1);
+            //_updateRandomNumbers();
         }
 
         private async void _createRngAction(InvokeRequest request)

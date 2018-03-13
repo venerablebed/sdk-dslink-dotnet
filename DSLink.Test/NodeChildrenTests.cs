@@ -14,7 +14,8 @@ namespace DSLink.Test
         private Mock<Connector> _mockConnector;
         private Mock<Responder> _mockResponder;
         private Mock<SubscriptionManager> _mockSubManager;
-        private Node _superRootNode;
+        private Mock<StreamManager> _mockStreamManager;
+        private SuperRootNode _superRootNode;
 
         [SetUp]
         public void SetUp()
@@ -23,18 +24,19 @@ namespace DSLink.Test
 
             _mockContainer = new Mock<DSLinkContainer>(config);
             _mockConnector = new Mock<Connector>(
-                _mockContainer.Object.Config,
-                _mockContainer.Object.Logger
+                _mockContainer.Object.Config
             );
             _mockResponder = new Mock<Responder>();
             _mockSubManager = new Mock<SubscriptionManager>(_mockContainer.Object);
+            _mockStreamManager = new Mock<StreamManager>(_mockContainer.Object);
 
             _mockContainer.SetupGet(c => c.Connector).Returns(_mockConnector.Object);
             _mockContainer.SetupGet(c => c.Responder).Returns(_mockResponder.Object);
             _mockResponder.SetupGet(r => r.SuperRoot).Returns(_superRootNode);
             _mockResponder.SetupGet(r => r.SubscriptionManager).Returns(_mockSubManager.Object);
+            _mockResponder.SetupGet(r => r.StreamManager).Returns(_mockStreamManager.Object);
 
-            _superRootNode = new Node("", null, _mockContainer.Object);
+            _superRootNode = new SuperRootNode(_mockContainer.Object, "", null);
         }
 
         [Test]

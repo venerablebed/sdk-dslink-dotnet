@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using DSLink.Logger;
 using DSLink.Serializer;
 using DSLink.Util;
 using Newtonsoft.Json;
@@ -11,6 +12,8 @@ namespace DSLink.Connection
 {
     public class Handshake
     {
+        private static readonly BaseLogger Log = LogManager.GetLogger();
+        
         /// <summary>
         /// DSA Version.
         /// </summary>
@@ -48,7 +51,7 @@ namespace DSLink.Connection
         /// </summary>
         public async Task<RemoteEndpoint> Shake()
         {
-            _link.Logger.Info("Handshaking with " + _buildUrl());
+            Log.Debug("Handshaking with " + _buildUrl());
             HttpResponseMessage resp = null;
             try
             {
@@ -56,25 +59,25 @@ namespace DSLink.Connection
             }
             catch (Exception e)
             {
-                _link.Logger.Error(e.Message);
+                Log.Error(e.Message);
             }
 
             if (resp == null)
             {
-                _link.Logger.Error("Handshake returned null.");
+                Log.Error("Handshake returned null.");
                 return null;
             }
             
-            _link.Logger.Debug("Handshake status code: " + resp.StatusCode.ToString());
+            Log.Debug("Handshake status code: " + resp.StatusCode.ToString());
 
             if (!resp.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            _link.Logger.Info("Handshake successful");
+            Log.Debug("Handshake successful");
             var bodyString = await resp.Content.ReadAsStringAsync();
-            _link.Logger.Debug("Handshake response: " + bodyString);
+            Log.Debug("Handshake response: " + bodyString);
             
             return JsonConvert.DeserializeObject<RemoteEndpoint>(
                 bodyString

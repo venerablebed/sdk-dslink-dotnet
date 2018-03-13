@@ -18,17 +18,16 @@ namespace DSLink
         private IVFS _vfs;
 
         public readonly string Name;
+        public KeyPair KeyPair;
         public readonly bool Requester;
         public readonly bool Responder;
         public bool LoadNodesJson = true;
         public string Token = "";
         public string BrokerUrl = "http://localhost:8080/conn";
         public string CommunicationFormat = "";
-        public LogLevel LogLevel = LogLevel.Info;
         public uint MaxConnectionCooldown = 60;
         public string StorageFolderPath = ".";
         public Type VFSType = typeof(SystemVFS);
-        public Type LoggerType = typeof(ConsoleLogger);
 
         public string Authentication => UrlBase64.Encode(SHA256.ComputeHash(Encoding.UTF8.GetBytes(RemoteEndpoint.salt).Concat(SharedSecret).ToArray()));
         public string CommunicationFormatUsed => (string.IsNullOrEmpty(CommunicationFormat) ? RemoteEndpoint.format : CommunicationFormat);
@@ -58,12 +57,6 @@ namespace DSLink
             get;
         }
 
-        public KeyPair KeyPair
-        {
-            get;
-            internal set;
-        }
-
         public Configuration(IEnumerable<string> args, string name, bool requester = false, bool responder = false)
         {
             _args = args;
@@ -71,17 +64,16 @@ namespace DSLink
             Name = name;
             Requester = requester;
             Responder = responder;
+            KeyPair = new KeyPair();
         }
 
         internal async Task _initKeyPair()
         {
-            const string KEYS_FILENAME = ".keys";
+            const string keysFilename = ".keys";
 
-            KeyPair = new KeyPair();
-
-            if (await VFS.ExistsAsync(KEYS_FILENAME))
+            if (await VFS.ExistsAsync(keysFilename))
             {
-                using (var stream = new StreamReader(await VFS.ReadAsync(KEYS_FILENAME)))
+                using (var stream = new StreamReader(await VFS.ReadAsync(keysFilename)))
                 {
                     var keyContents = stream.ReadLine();
                     KeyPair.LoadFrom(keyContents);
@@ -91,8 +83,8 @@ namespace DSLink
             {
                 KeyPair.Generate();
 
-                await VFS.CreateAsync(KEYS_FILENAME, false);
-                using (var stream = new StreamWriter(await VFS.WriteAsync(KEYS_FILENAME)))
+                await VFS.CreateAsync(keysFilename, false);
+                using (var stream = new StreamWriter(await VFS.WriteAsync(keysFilename)))
                 {
                     var keyContents = KeyPair.Save();
                     stream.WriteLine(keyContents);
@@ -111,7 +103,7 @@ namespace DSLink
                     "token=", val => Token = val
                 },
                 {
-                    "log=", val => { LogLevel = LogLevel.ParseLogLevel(val); }
+                    "log=", val => { GlobalConfiguration.LogLevel = LogLevel.ParseLogLevel(val); }
                 },
                 {
                     "format=", val => CommunicationFormat = val

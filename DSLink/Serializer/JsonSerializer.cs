@@ -4,25 +4,18 @@ using Newtonsoft.Json.Linq;
 
 namespace DSLink.Serializer
 {
-    /// <summary>
-    /// JSON implementation of serializer.
-    /// </summary>
     public class JsonSerializer : BaseSerializer
     {
-        public bool RequiresBinaryStream => false;
-
-        private readonly JsonByteArrayConverter _byteArrayConverter;
         private readonly JsonSerializerSettings _serializerSettings;
 
         public JsonSerializer()
         {
-            _byteArrayConverter = new JsonByteArrayConverter();
             _serializerSettings = new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore,
                 Converters = new List<JsonConverter>
                 {
-                    _byteArrayConverter
+                    new JsonByteArrayConverter()
                 }
             };
         }

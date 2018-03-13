@@ -10,11 +10,13 @@ namespace DSLink.Connection
 {
     public class WebSocketConnector : Connector
     {
+        private static readonly BaseLogger _log = LogManager.GetLogger();
+        
         private readonly ClientWebSocket _ws;
         private readonly CancellationTokenSource _tokenSource;
 
-        public WebSocketConnector(Configuration config, BaseLogger logger)
-            : base(config, logger)
+        public WebSocketConnector(Configuration config)
+            : base(config)
         {
             _ws = new ClientWebSocket();
             _tokenSource = new CancellationTokenSource();
@@ -24,7 +26,7 @@ namespace DSLink.Connection
         {
             await base.Connect();
 
-            _logger.Info("WebSocket connecting to " + WsUrl);
+            _log.Debug("WebSocket connecting to " + WsUrl);
             await _ws.ConnectAsync(new Uri(WsUrl), CancellationToken.None);
             _startWatchTask();
             EmitOpen();
@@ -80,7 +82,6 @@ namespace DSLink.Connection
                 while (_ws.State == WebSocketState.Open)
                 {
                     var buffer = new byte[1024];
-                    var bufferUsed = 0;
                     var bytes = new List<byte>();
                     var str = "";
 
@@ -92,7 +93,7 @@ namespace DSLink.Connection
                         goto RECV;
                     }
 
-                    bufferUsed = result.Count;
+                    var bufferUsed = result.Count;
 
                     switch (result.MessageType)
                     {

@@ -16,7 +16,7 @@ namespace DSLink.Respond
             set;
         }
 
-        public virtual Node SuperRoot
+        public virtual SuperRootNode SuperRoot
         {
             get;
             protected set;

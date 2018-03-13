@@ -18,9 +18,9 @@ namespace DSLink.Nodes
 
         public Node BuildNode()
         {
+            _node.InitializeClass();
             _node.Building = false;
             _node.Parent.AddChild(_node);
-            _node.InitializeClass();
             return _node;
         }
 

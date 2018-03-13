@@ -48,7 +48,7 @@ namespace DSLink.Logger
         /// <returns>Whether the logger should print</returns>
         public bool DoesPrint(LogLevel toPrint)
         {
-            return toPrint.Level >= Level;
+            return toPrint.Level <= Level;
         }
 
         /// <summary>
