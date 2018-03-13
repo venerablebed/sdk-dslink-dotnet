@@ -45,16 +45,10 @@ namespace DSLink
             }
 
             // Connector events
-            _connector.OnMessage += OnStringRead;
-            _connector.OnBinaryMessage += OnBinaryRead;
-            _connector.OnWrite += OnStringWrite;
-            _connector.OnBinaryWrite += OnBinaryWrite;
+            _connector.OnMessage += OnMessage;
+            _connector.OnBinaryMessage += OnMessage;
             _connector.OnOpen += OnOpen;
             _connector.OnClose += OnClose;
-
-            // Overridable events for DSLink writers
-            _connector.OnOpen += OnConnectionOpen;
-            _connector.OnClose += OnConnectionClosed;
         }
 
         /// <summary>
@@ -160,12 +154,14 @@ namespace DSLink
 
         private async void OnOpen()
         {
+            OnConnectionOpen();
             _pingPeriodicTask.Start();
             await Connector.Flush();
         }
 
         private async void OnClose()
         {
+            OnConnectionClosed();
             _pingPeriodicTask.Stop();
             if (Responder != null)
             {
@@ -181,23 +177,23 @@ namespace DSLink
 
         /// <summary>
         /// Called when the connection is opened to the broker.
-        /// Override when you need to do something after connection opens.
+        /// Override when you need to perform an action after connection opens.
         /// </summary>
         protected virtual void OnConnectionOpen() {}
 
         /// <summary>
         /// Called when the connection is closed to the broker.
-        /// Override when you need to do something after connection closes.
+        /// Override when you need to perform an action after connection closes.
         /// </summary>
         protected virtual void OnConnectionClosed() {}
 
         /// <summary>
         /// Called when the connection fails to connect to the broker.
-        /// Override when you need to detect a failure to connect.
+        /// Override when you need to perform an action after failure to connect.
         /// </summary>
         protected virtual void OnConnectionFailed() {}
 
-        private async Task OnMessage(JObject message)
+        private async void OnMessage(JObject message)
         {
             var response = new JObject();
             if (message["msg"] != null)
@@ -230,56 +226,6 @@ namespace DSLink
             if (write)
             {
                 await Connector.Write(response);
-            }
-        }
-
-        private async void OnStringRead(MessageEvent messageEvent)
-        {
-            LogMessageString(false, messageEvent);
-            await OnMessage(Connector.DataSerializer.Deserialize(messageEvent.Message));
-        }
-
-        private void OnStringWrite(MessageEvent messageEvent)
-        {
-            LogMessageString(true, messageEvent);
-        }
-
-        private async void OnBinaryRead(BinaryMessageEvent messageEvent)
-        {
-            LogMessageBytes(false, messageEvent);
-            await OnMessage(Connector.DataSerializer.Deserialize(messageEvent.Message));
-        }
-
-        private void OnBinaryWrite(BinaryMessageEvent messageEvent)
-        {
-            LogMessageBytes(true, messageEvent);
-        }
-
-        private void LogMessageString(bool sent, MessageEvent messageEvent)
-        {
-            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
-            {
-                var verb = sent ? "Sent" : "Received";
-                var logString = $"Text {verb}: {messageEvent.Message}";
-                Log.Debug(logString);
-            }
-        }
-
-        private void LogMessageBytes(bool sent, BinaryMessageEvent messageEvent)
-        {
-            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
-            {
-                var verb = sent ? "Sent" : "Received";
-                var logString = $"Binary {verb}: ";
-                if (messageEvent.Message.Length < 5000)
-                {
-                    logString += BitConverter.ToString(messageEvent.Message);
-                }
-                else
-                {
-                    logString += "(over 5000 bytes)";
-                }
-                Log.Debug(logString);
             }
         }
 

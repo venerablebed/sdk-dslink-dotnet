@@ -73,15 +73,18 @@ namespace DSLink.Example
 
         private async void _updateRandomNumbers()
         {
-            lock (_rngValues)
+            while (true)
             {
-                foreach (var kv in _rngValues)
+                lock (_rngValues)
                 {
-                    kv.Value.Set(_random.Next());
+                    foreach (var kv in _rngValues)
+                    {
+                        kv.Value.Set(_random.Next());
+                    }
                 }
+
+                await Task.Delay(1);
             }
-            //await Task.Delay(1);
-            //_updateRandomNumbers();
         }
 
         private async void _createRngAction(InvokeRequest request)

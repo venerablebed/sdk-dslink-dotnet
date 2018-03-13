@@ -10,7 +10,7 @@ namespace DSLink.Connection
 {
     public class WebSocketConnector : Connector
     {
-        private static readonly BaseLogger _log = LogManager.GetLogger();
+        private static readonly BaseLogger Log = LogManager.GetLogger();
         
         private readonly ClientWebSocket _ws;
         private readonly CancellationTokenSource _tokenSource;
@@ -26,7 +26,7 @@ namespace DSLink.Connection
         {
             await base.Connect();
 
-            _log.Debug("WebSocket connecting to " + WsUrl);
+            Log.Debug("WebSocket connecting to " + WsUrl);
             await _ws.ConnectAsync(new Uri(WsUrl), CancellationToken.None);
             _startWatchTask();
             EmitOpen();
@@ -105,7 +105,7 @@ namespace DSLink.Connection
                                 str += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
                                 if (!result.EndOfMessage)
                                     goto RECV;
-                                EmitMessage(new MessageEvent(str));
+                                EmitMessage(str);
                             }
                             break;
                         case WebSocketMessageType.Binary:
@@ -115,7 +115,7 @@ namespace DSLink.Connection
                                 bytes.AddRange(newBytes);
                                 if (!result.EndOfMessage)
                                     goto RECV;
-                                EmitBinaryMessage(new BinaryMessageEvent(bytes.ToArray()));
+                                EmitBinaryMessage(bytes.ToArray());
                             }
                             break;
                         default:

@@ -73,24 +73,9 @@ namespace DSLink.Connection
         }
 
         /// <summary>
-        /// True if the WebSocket implementation supports binary.
-        /// </summary>
-        public virtual bool SupportsBinary => false;
-
-        /// <summary>
         /// True if the WebSocket implementation supports compression.
         /// </summary>
         public virtual bool SupportsCompression => false;
-
-        /// <summary>
-        /// Event occurs when String data is written over the connection.
-        /// </summary>
-        public event Action<MessageEvent> OnWrite;
-
-        /// <summary>
-        /// Event occurs when Binary data is written over the connection.
-        /// </summary>
-        public event Action<BinaryMessageEvent> OnBinaryWrite;
 
         /// <summary>
         /// Event occurs when the connection is opened.
@@ -105,12 +90,12 @@ namespace DSLink.Connection
         /// <summary>
         /// Event occurs when String data is received.
         /// </summary>
-        public event Action<MessageEvent> OnMessage;
+        public event Action<JObject> OnMessage;
 
         /// <summary>
         /// Event occurs when Binary data is received.
         /// </summary>
-        public event Action<BinaryMessageEvent> OnBinaryMessage;
+        public event Action<JObject> OnBinaryMessage;
 
         protected Connector(Configuration config)
         {
@@ -191,7 +176,7 @@ namespace DSLink.Connection
         /// </summary>
         /// <param name="data">RootObject to serialize and send</param>
         /// <param name="allowQueue">Whether to allow the data to be added to the queue</param>
-        public virtual async Task Write(JObject data, bool allowQueue = true)
+        public async Task Write(JObject data, bool allowQueue = true)
         {
             if ((!Connected() || EnableQueue) && allowQueue)
             {
@@ -299,8 +284,8 @@ namespace DSLink.Connection
         /// <param name="data">String to write</param>
         public virtual Task Write(string data)
         {
-            OnWrite?.Invoke(new MessageEvent(data));
-            return Task.FromResult(false);
+            LogMessageString(true, data);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -309,8 +294,8 @@ namespace DSLink.Connection
         /// <param name="data">Binary to write</param>
         public virtual Task Write(byte[] data)
         {
-            OnBinaryWrite?.Invoke(new BinaryMessageEvent(data));
-            return Task.FromResult(false);
+            LogMessageBytes(true, data);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -333,22 +318,23 @@ namespace DSLink.Connection
         }
 
         /// <summary>
-        /// Emit the message connector event.
+        /// Emits a string message.
         /// </summary>
-        /// <param name="messageEvent">Message event</param>
-        protected void EmitMessage(MessageEvent messageEvent)
+        /// <<param name="data">String data</param>
+        protected void EmitMessage(string data)
         {
-            OnMessage?.Invoke(messageEvent);
+            LogMessageString(false, data);
+            OnMessage?.Invoke(DataSerializer.Deserialize(data));
         }
 
         /// <summary>
-        /// Emits the binary message.
+        /// Emits a binary message.
         /// </summary>
-        /// <returns>The binary message.</returns>
-        /// <param name="messageEvent">Message event.</param>
-        protected void EmitBinaryMessage(BinaryMessageEvent messageEvent)
+        /// <param name="data">Binary data</param>
+        protected void EmitBinaryMessage(byte[] data)
         {
-            OnBinaryMessage?.Invoke(messageEvent);
+            LogMessageBytes(false, data);
+            OnMessage?.Invoke(DataSerializer.Deserialize(data));
         }
 
         /// <summary>
@@ -419,17 +405,44 @@ namespace DSLink.Connection
         /// <param name="data">String or Binary data</param>
         private void WriteData(dynamic data)
         {
-            if (data is string)
+            switch (data)
             {
-                Write(data);
+                case string _:
+                    Write(data);
+                    break;
+                case byte[] _:
+                    Write(data);
+                    break;
+                default:
+                    throw new FormatException($"Cannot send message of type {data.Type}");
             }
-            else if (data is byte[])
+        }
+
+        private static void LogMessageString(bool sent, string data)
+        {
+            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
             {
-                Write(data);
+                var verb = sent ? "Sent" : "Received";
+                var logString = $"Text {verb}: {data}";
+                Log.Debug(logString);
             }
-            else
+        }
+
+        private static void LogMessageBytes(bool sent, byte[] data)
+        {
+            if (Log.ToPrint.DoesPrint(LogLevel.Debug))
             {
-                throw new FormatException($"Cannot send message of type {data.Type}");
+                var verb = sent ? "Sent" : "Received";
+                var logString = $"Binary {verb}: ";
+                if (data.Length < 5000)
+                {
+                    logString += BitConverter.ToString(data);
+                }
+                else
+                {
+                    logString += "(over 5000 bytes)";
+                }
+                Log.Debug(logString);
             }
         }
     }
