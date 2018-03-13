@@ -2,10 +2,14 @@
 ## About
 This DSLink library is targeted towards .NET Standard 2.0.
 For more information on the specifics about .NET Standard, please visit the [.NET Standard repo](https://github.com/dotnet/standard/blob/master/docs/versions.md).
-It is currently being overhauled to target the broadest number of platforms, with the least amount of code and additional dependencies as possible.
 
 ## Getting Started
+### DSLink
 In this solution, the project DSLink.Example provides a very simple introduction DSLink. More examples will come soon.
+
+### Broker
+There is an experimental broker being developed in the DSLink.Broker project. It is powered by ASP.NET Core, which runs
+on Windows, macOS and Linux.
 
 ### License
 This library is licensed under Apache v2.0, our license is provided [here](https://github.com/IOT-DSA/sdk-dslink-dotnet/blob/master/LICENSE.md).
