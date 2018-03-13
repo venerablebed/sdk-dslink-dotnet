@@ -15,7 +15,6 @@ namespace DSLink
         
         private readonly PeriodicTask _pingPeriodicTask;
         private Handshake _handshake;
-        private bool _reconnectOnFailure;
         private bool _isLinkInitialized;
         private readonly Configuration _config;
         private readonly DSLinkResponder _responder;
@@ -32,7 +31,6 @@ namespace DSLink
             _pingPeriodicTask = new PeriodicTask(OnPingTaskElapsed, 30000);
             _config = config;
             _config._processOptions();
-            _reconnectOnFailure = true;
             _connector = new WebSocketConnector(_config);
 
             if (Config.Responder)
@@ -46,9 +44,9 @@ namespace DSLink
 
             // Connector events
             _connector.OnMessage += OnMessage;
-            _connector.OnBinaryMessage += OnMessage;
             _connector.OnOpen += OnOpen;
             _connector.OnClose += OnClose;
+            _connector.OnFailure += OnFailure;
         }
 
         /// <summary>
@@ -93,7 +91,6 @@ namespace DSLink
         {
             await Initialize();
 
-            _reconnectOnFailure = true;
             _handshake = new Handshake(this);
             var attemptsLeft = maxAttempts;
             uint attempts = 1;
@@ -104,7 +101,7 @@ namespace DSLink
                 {
                     _config.RemoteEndpoint = handshakeResult;
                     await Connector.Connect();
-                    return Connector.ConnectionState;
+                    return Connector.State;
                 }
 
                 var delay = attempts;
@@ -126,10 +123,9 @@ namespace DSLink
             return ConnectionState.Disconnected;
         }
 
-        public void Disconnect()
+        public async void Disconnect()
         {
-            _reconnectOnFailure = false;
-            Connector.Disconnect();
+            await Connector.Disconnect();
         }
 
         public async Task<bool> LoadSavedNodes()
@@ -159,20 +155,24 @@ namespace DSLink
             await Connector.Flush();
         }
 
-        private async void OnClose()
+        private void OnClose()
         {
             OnConnectionClosed();
             _pingPeriodicTask.Stop();
             if (Responder != null)
             {
+                Log.Debug("Resetting responder state");
                 Responder.SubscriptionManager.ClearAll();
                 Responder.StreamManager.ClearAll();
             }
+        }
 
-            if (_reconnectOnFailure)
-            {
-                await Connect();
-            }
+        private async void OnFailure()
+        {
+            OnConnectionFailed();
+            _pingPeriodicTask.Stop();
+
+            await Connect();
         }
 
         /// <summary>
@@ -225,16 +225,17 @@ namespace DSLink
 
             if (write)
             {
-                await Connector.Write(response);
+                await Connector.Send(response);
             }
         }
 
         private async void OnPingTaskElapsed()
         {
-            if (Connector.Connected())
+            if (Connector.State == ConnectionState.Connected)
             {
                 // Write a blank message containing no responses/requests.
-                await Connector.Write(new JObject(), false);
+                // Disable the queue for this specific message.
+                await Connector.Send(new JObject(), false);
             }
         }
     }

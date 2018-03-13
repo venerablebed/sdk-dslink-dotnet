@@ -53,7 +53,7 @@ namespace DSLink.Request
         {
             var request = new ListRequest(RequestId.Next, callback, path);
             RequestManager.StartRequest(request);
-            await _link.Connector.Write(new JObject
+            await _link.Connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -73,7 +73,7 @@ namespace DSLink.Request
         {
             var request = new SetRequest(RequestId.Next, path, permission, value);
             RequestManager.StartRequest(request);
-            await _link.Connector.Write(new JObject
+            await _link.Connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -91,7 +91,7 @@ namespace DSLink.Request
         {
             var request = new RemoveRequest(RequestId.Next, path);
             RequestManager.StartRequest(request);
-            await _link.Connector.Write(new JObject
+            await _link.Connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -112,7 +112,7 @@ namespace DSLink.Request
         {
             var request = new InvokeRequest(RequestId.Next, path, permission, parameters, callback);
             RequestManager.StartRequest(request);
-            await _link.Connector.Write(new JObject
+            await _link.Connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {

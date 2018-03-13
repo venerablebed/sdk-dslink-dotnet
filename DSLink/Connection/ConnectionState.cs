@@ -5,6 +5,7 @@
         Disconnecting,
         Disconnected,
         Connecting,
-        Connected
+        Connected,
+        Failure
     }
 }

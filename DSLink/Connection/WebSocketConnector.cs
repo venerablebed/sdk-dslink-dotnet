@@ -12,69 +12,47 @@ namespace DSLink.Connection
     {
         private static readonly BaseLogger Log = LogManager.GetLogger();
         
-        private readonly ClientWebSocket _ws;
-        private readonly CancellationTokenSource _tokenSource;
+        private ClientWebSocket _ws;
+        private CancellationTokenSource _tokenSource;
 
         public WebSocketConnector(Configuration config)
             : base(config)
         {
+        }
+
+        protected override async Task<ConnectionState> Open()
+        {
             _ws = new ClientWebSocket();
             _tokenSource = new CancellationTokenSource();
-        }
-
-        public override async Task Connect()
-        {
-            await base.Connect();
-
-            Log.Debug("WebSocket connecting to " + WsUrl);
             await _ws.ConnectAsync(new Uri(WsUrl), CancellationToken.None);
             _startWatchTask();
-            EmitOpen();
+
+            return _ws.State == WebSocketState.Open ? ConnectionState.Connected : ConnectionState.Disconnected;
         }
 
-        /// <summary>
-        /// Disconnect from the WebSocket.
-        /// </summary>
-        public async override Task Disconnect()
+        protected override async Task<ConnectionState> Close()
         {
             _stopWatchTask();
-            await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnecting", _tokenSource.Token);
-            _ws.Dispose();
+            await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnecting", CancellationToken.None);
+            _ws = null;
 
-            await base.Disconnect();
+            return ConnectionState.Disconnected;
         }
 
-        /// <summary>
-        /// Returns true if the WebSocket is connected.
-        /// </summary>
-        public override bool Connected()
+        protected override Task Write(string data)
         {
-            return _ws != null && _ws.State == WebSocketState.Open;
-        }
-
-        /// <summary>
-        /// Writes a string over the WebSocket connection.
-        /// </summary>
-        /// <param name="data">String data</param>
-        public override Task Write(string data)
-        {
-            base.Write(data);
             var bytes = Encoding.UTF8.GetBytes(data);
             return _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _tokenSource.Token);
         }
 
-        /// <summary>
-        /// Writes binary over the WebSocket connection.
-        /// </summary>
-        /// <param name="data">Binary data</param>
-        public override Task Write(byte[] data)
+        protected override Task Write(byte[] data)
         {
-            base.Write(data);
             return _ws.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, _tokenSource.Token);
         }
 
         private void _startWatchTask()
         {
+            Log.Debug("Starting watch task");
             Task.Run(async () =>
             {
                 var token = _tokenSource.Token;
@@ -98,25 +76,22 @@ namespace DSLink.Connection
                     switch (result.MessageType)
                     {
                         case WebSocketMessageType.Close:
-                            await Disconnect();
+                            Log.Debug($"Received close from broker: {result.CloseStatusDescription}");
+                            EmitFailure();
                             break;
                         case WebSocketMessageType.Text:
-                            {
-                                str += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-                                if (!result.EndOfMessage)
-                                    goto RECV;
-                                EmitMessage(str);
-                            }
+                            str += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                            if (!result.EndOfMessage)
+                                goto RECV;
+                            Receive(str);
                             break;
                         case WebSocketMessageType.Binary:
-                            {
-                                var newBytes = new byte[bufferUsed];
-                                Array.Copy(buffer, newBytes, bufferUsed);
-                                bytes.AddRange(newBytes);
-                                if (!result.EndOfMessage)
-                                    goto RECV;
-                                EmitBinaryMessage(bytes.ToArray());
-                            }
+                            var newBytes = new byte[bufferUsed];
+                            Array.Copy(buffer, newBytes, bufferUsed);
+                            bytes.AddRange(newBytes);
+                            if (!result.EndOfMessage)
+                                goto RECV;
+                            Receive(bytes.ToArray());
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -124,7 +99,7 @@ namespace DSLink.Connection
 
                     if (token.IsCancellationRequested)
                     {
-                        await Disconnect();
+                        break;
                     }
                 }
 
@@ -134,6 +109,7 @@ namespace DSLink.Connection
 
         private void _stopWatchTask()
         {
+            Log.Debug("Stopping watch task");
             _tokenSource.Cancel();
         }
     }

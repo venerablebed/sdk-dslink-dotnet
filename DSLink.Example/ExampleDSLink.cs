@@ -40,7 +40,7 @@ namespace DSLink.Example
             _rngValues = new Dictionary<string, Value>();
             _random = new Random();
 
-            Responder.AddNodeClass("rngAdd", delegate (Node node)
+            Responder.AddNodeClass("rngAdd", node =>
             {
                 node.Configs.Set(ConfigType.DisplayName, new Value("Create RNG"));
                 node.AddParameter(new Parameter
@@ -50,8 +50,8 @@ namespace DSLink.Example
                 });
                 node.SetAction(new ActionHandler(Permission.Config, _createRngAction));
             });
-
-            Responder.AddNodeClass("rng", delegate (Node node)
+            
+            Responder.AddNodeClass("rng", node =>
             {
                 node.Configs.Set(ConfigType.Writable, new Value(Permission.Read.Permit));
                 node.Configs.Set(ConfigType.ValueType, Nodes.ValueType.Number.TypeValue);
@@ -62,13 +62,26 @@ namespace DSLink.Example
                     _rngValues.Add(node.Name, node.Value);
                 }
             });
+            
+            Responder.AddNodeClass("disconnect", node =>
+            {
+                node.SetAction(new ActionHandler(Permission.Config, _disconnect));
+            });
 
             Task.Run(() => _updateRandomNumbers());
+        }
+
+        private async void _disconnect(InvokeRequest obj)
+        {
+            Disconnect();
+            await obj.Close();
+            await Connect();
         }
 
         public override void InitializeDefaultNodes()
         {
             Responder.SuperRoot.CreateChild("createRNG", "rngAdd").BuildNode();
+            Responder.SuperRoot.CreateChild("disconnect", "disconnect").BuildNode();
         }
 
         private async void _updateRandomNumbers()
@@ -93,7 +106,7 @@ namespace DSLink.Example
             if (string.IsNullOrEmpty(rngName)) return;
             if (Responder.SuperRoot.Children.ContainsKey(rngName)) return;
 
-            var newRng = Responder.SuperRoot.CreateChild(rngName, "rng").BuildNode();
+            Responder.SuperRoot.CreateChild(rngName, "rng").BuildNode();
 
             await request.Close();
             await SaveNodes();

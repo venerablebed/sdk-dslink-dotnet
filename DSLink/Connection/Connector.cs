@@ -15,13 +15,9 @@ namespace DSLink.Connection
         private readonly Configuration _config;
         private readonly IncrementingIndex _msgId;
 
-        public virtual BaseSerializer DataSerializer { get; private set; }
+        public virtual BaseSerializer Serializer { get; private set; }
 
-        public ConnectionState ConnectionState
-        {
-            private set;
-            get;
-        }
+        public ConnectionState State { get; private set; }
 
         /// <summary>
         /// Queue object for queueing up data when the WebSocket is either closed
@@ -65,11 +61,7 @@ namespace DSLink.Connection
 #pragma warning restore CS4014
                 }
             }
-            get
-            {
-                //return _enableQueue;
-                return false;
-            }
+            get => _enableQueue;
         }
 
         /// <summary>
@@ -78,41 +70,35 @@ namespace DSLink.Connection
         public virtual bool SupportsCompression => false;
 
         /// <summary>
-        /// Event occurs when the connection is opened.
+        /// Event that is triggered when the connection is opened.
         /// </summary>
         public event Action OnOpen;
 
         /// <summary>
-        /// Event occurs when the connection is closed.
+        /// Event that is triggered when the connection is closed.
         /// </summary>
         public event Action OnClose;
+
+        /// <summary>
+        /// Event that is triggered upon connection failure.
+        /// </summary>
+        public event Action OnFailure;
 
         /// <summary>
         /// Event occurs when String data is received.
         /// </summary>
         public event Action<JObject> OnMessage;
 
-        /// <summary>
-        /// Event occurs when Binary data is received.
-        /// </summary>
-        public event Action<JObject> OnBinaryMessage;
-
         protected Connector(Configuration config)
         {
             _config = config;
-            ConnectionState = ConnectionState.Disconnected;
+            State = ConnectionState.Disconnected;
             _msgId = new IncrementingIndex();
 
-            OnOpen += () =>
+            OnFailure += () =>
             {
-                ConnectionState = ConnectionState.Connected;
-                Log.Info($"Connected");
-            };
-
-            OnClose += () =>
-            {
-                ConnectionState = ConnectionState.Disconnected;
-                Log.Info("Disconnected");
+                State = ConnectionState.Failure;
+                Log.Error("Connection failure");
             };
         }
 
@@ -144,41 +130,56 @@ namespace DSLink.Connection
         /// <summary>
         /// Connect to the broker.
         /// </summary>
-        public virtual Task Connect()
+        public async Task Connect()
         {
-            DataSerializer = (BaseSerializer) Activator.CreateInstance(
+            Serializer = (BaseSerializer) Activator.CreateInstance(
                 Serializers.Types[_config.CommunicationFormatUsed]
             );
-            ConnectionState = ConnectionState.Connecting;
+            State = ConnectionState.Connecting;
             Log.Info("Connecting");
+            Log.Debug($"Connecting to {WsUrl}");
 
-            return Task.CompletedTask;
+            State = await Open();
+
+            if (State == ConnectionState.Connected)
+            {
+                OnOpen?.Invoke();
+            }
+            else
+            {
+                OnFailure?.Invoke();
+            }
         }
 
         /// <summary>
         /// Disconnect from the broker.
         /// </summary>
-        public virtual Task Disconnect()
+        public async Task Disconnect()
         {
-            ConnectionState = ConnectionState.Disconnecting;
+            State = ConnectionState.Disconnecting;
             Log.Info("Disconnecting");
 
-            return Task.CompletedTask;
+            State = await Close();
+
+            if (State == ConnectionState.Disconnected)
+            {
+                OnClose?.Invoke();
+            }
         }
 
-        /// <summary>
-        /// True if connected to a broker.
-        /// </summary>
-        public abstract bool Connected();
+        protected abstract Task<ConnectionState> Open();
+        protected abstract Task<ConnectionState> Close();
+        protected abstract Task Write(string data);
+        protected abstract Task Write(byte[] data);
 
         /// <summary>
         /// Write the specified data.
         /// </summary>
         /// <param name="data">RootObject to serialize and send</param>
         /// <param name="allowQueue">Whether to allow the data to be added to the queue</param>
-        public async Task Write(JObject data, bool allowQueue = true)
+        public async Task Send(JObject data, bool allowQueue = true)
         {
-            if ((!Connected() || EnableQueue) && allowQueue)
+            if ((State != ConnectionState.Connected || EnableQueue) && allowQueue)
             {
                 lock (_queueLock)
                 {
@@ -196,7 +197,7 @@ namespace DSLink.Connection
                     {
                         foreach (var resp in data["responses"].Value<JArray>())
                         {
-                            ((JArray)_queue["responses"]).Add(resp);
+                            ((JArray) _queue["responses"]).Add(resp);
                         }
                     }
 
@@ -204,7 +205,7 @@ namespace DSLink.Connection
                     {
                         foreach (var req in data["requests"].Value<JArray>())
                         {
-                            ((JArray)_queue["requests"]).Add(req);
+                            ((JArray) _queue["requests"]).Add(req);
                         }
                     }
 
@@ -219,10 +220,13 @@ namespace DSLink.Connection
                         _hasQueueEvent = true;
                     }
                 }
+
                 if (_hasQueueEvent)
                 {
                     await TriggerQueueFlush();
                 }
+
+                return;
             }
 
             if (data["msg"] == null)
@@ -240,7 +244,18 @@ namespace DSLink.Connection
                 data.Remove("responses");
             }
 
-            WriteData(DataSerializer.Serialize(data));
+            var serialized = Serializer.Serialize(data);
+            switch (serialized)
+            {
+                case string _:
+                    SendData(serialized);
+                    break;
+                case byte[] _:
+                    SendData(serialized);
+                    break;
+                default:
+                    throw new FormatException($"Cannot send message of type {serialized.Type}");
+            }
         }
 
         /// <summary>
@@ -267,13 +282,13 @@ namespace DSLink.Connection
             {
                 var response = new JObject
                 {
-                    {"rid", 0},
-                    {"updates", new JArray { update }}
+                    new JProperty("rid", 0),
+                    new JProperty("updates", new JArray { update })
                 };
 
-                await Write(new JObject
+                await Send(new JObject
                 {
-                    {"responses", new JArray { response }}
+                    new JProperty("responses", new JArray { response })
                 });
             }
         }
@@ -282,70 +297,46 @@ namespace DSLink.Connection
         /// Writes a string to the connector.
         /// </summary>
         /// <param name="data">String to write</param>
-        public virtual Task Write(string data)
+        private Task SendData(string data)
         {
             LogMessageString(true, data);
-            return Task.CompletedTask;
+            return Write(data);
         }
 
         /// <summary>
         /// Writes binary to the connector.
         /// </summary>
         /// <param name="data">Binary to write</param>
-        public virtual Task Write(byte[] data)
+        private Task SendData(byte[] data)
         {
             LogMessageBytes(true, data);
-            return Task.CompletedTask;
+            return Write(data);
         }
 
-        /// <summary>
-        /// Emit the open connector event.
-        /// </summary>
-        protected virtual void EmitOpen()
+        protected void EmitFailure()
         {
-            OnOpen?.Invoke();
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            Flush();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            OnFailure?.Invoke();
         }
 
-        /// <summary>
-        /// Emit the close connector event.
-        /// </summary>
-        protected virtual void EmitClose()
-        {
-            OnClose?.Invoke();
-        }
-
-        /// <summary>
-        /// Emits a string message.
-        /// </summary>
-        /// <<param name="data">String data</param>
-        protected void EmitMessage(string data)
+        protected void Receive(string data)
         {
             LogMessageString(false, data);
-            OnMessage?.Invoke(DataSerializer.Deserialize(data));
+            OnMessage?.Invoke(Serializer.Deserialize(data));
         }
-
-        /// <summary>
-        /// Emits a binary message.
-        /// </summary>
-        /// <param name="data">Binary data</param>
-        protected void EmitBinaryMessage(byte[] data)
+        
+        protected void Receive(byte[] data)
         {
             LogMessageBytes(false, data);
-            OnMessage?.Invoke(DataSerializer.Deserialize(data));
+            OnMessage?.Invoke(Serializer.Deserialize(data));
         }
 
-        /// <summary>
-        /// Flush the queue.
-        /// </summary>
         internal async Task Flush(bool fromEvent = false)
         {
-            if (!Connected())
+            if (State != ConnectionState.Connected)
             {
                 return;
             }
+
             Log.Debug("Flushing connection message queue");
             JObject queueToFlush = null;
             lock (_queueLock)
@@ -385,9 +376,10 @@ namespace DSLink.Connection
                     _subscriptionValueQueue = new JArray();
                 }
             }
+
             if (queueToFlush != null)
             {
-                await Write(queueToFlush, false);
+                await Send(queueToFlush, false);
             }
         }
 
@@ -397,25 +389,6 @@ namespace DSLink.Connection
         internal async Task TriggerQueueFlush()
         {
             await Flush(true);
-        }
-
-        /// <summary>
-        /// Write data to the connection.
-        /// </summary>
-        /// <param name="data">String or Binary data</param>
-        private void WriteData(dynamic data)
-        {
-            switch (data)
-            {
-                case string _:
-                    Write(data);
-                    break;
-                case byte[] _:
-                    Write(data);
-                    break;
-                default:
-                    throw new FormatException($"Cannot send message of type {data.Type}");
-            }
         }
 
         private static void LogMessageString(bool sent, string data)
@@ -442,6 +415,7 @@ namespace DSLink.Connection
                 {
                     logString += "(over 5000 bytes)";
                 }
+
                 Log.Debug(logString);
             }
         }

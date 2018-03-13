@@ -41,7 +41,7 @@ namespace DSLink.Request
             if (!_subscriptions.ContainsKey(path))
             {
                 _subscriptions.Add(path, new Subscription(sid));
-                await _link.Connector.Write(new JObject
+                await _link.Connector.Send(new JObject
                 {
                     new JProperty("requests", new JArray
                     {
@@ -64,7 +64,7 @@ namespace DSLink.Request
             _subIdToPath.Remove(subId);
             if (sub.VirtualSubs.Count == 0)
             {
-                await _link.Connector.Write(new JObject
+                await _link.Connector.Send(new JObject
                 {
                     new JProperty("requests", new JArray
                     {

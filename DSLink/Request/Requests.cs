@@ -272,7 +272,7 @@ namespace DSLink.Request
 
                 updateRootObject["responses"].First["columns"] = _columns;
             }
-            await _link.Connector.Write(updateRootObject);
+            await _link.Connector.Send(updateRootObject);
         }
 
         /// <summary>
@@ -284,7 +284,7 @@ namespace DSLink.Request
             {
                 throw new NotSupportedException("Link is null, cannot send updates");
             }
-            await _link.Connector.Write(new JObject
+            await _link.Connector.Send(new JObject
             {
                 new JProperty("responses", new JArray
                 {

@@ -83,7 +83,7 @@ namespace DSLink.Nodes
 
         public void Set(string val, bool force = false)
         {
-            if (val.StartsWith("\x1B" + "bytes:") || val.StartsWith("\\u001bbytes:"))
+            if (val != null && (val.StartsWith("\x1B" + "bytes:") || val.StartsWith("\\u001bbytes:")))
             {
                 var bytes = UrlBase64.Decode(val.Substring(val.IndexOf(":", StringComparison.Ordinal) + 1));
                 Set(bytes);

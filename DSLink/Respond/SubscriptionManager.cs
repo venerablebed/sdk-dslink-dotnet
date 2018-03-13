@@ -66,7 +66,7 @@ namespace DSLink.Respond
                         });
                     }
                 }
-                await _link.Connector.Write(new JObject
+                await _link.Connector.Send(new JObject
                 {
                     new JProperty("responses", responses)
                 });

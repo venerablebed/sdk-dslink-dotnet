@@ -34,7 +34,7 @@ namespace DSLink.Test
             );
 
             _mockContainer.SetupGet(c => c.Connector).Returns(_mockConnector.Object);
-            _mockConnector.SetupGet(c => c.DataSerializer).Returns(_jsonSerializer);
+            _mockConnector.SetupGet(c => c.Serializer).Returns(_jsonSerializer);
 
             _responder = new DSLinkResponder(_mockContainer.Object);
             _mockContainer.SetupGet(c => c.Responder).Returns(_responder);

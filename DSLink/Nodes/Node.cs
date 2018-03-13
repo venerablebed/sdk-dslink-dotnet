@@ -195,10 +195,10 @@ namespace DSLink.Nodes
             _subscribers = new List<int>();
             _streams = new List<int>();
 
-            _createInitialData();
-
             Value = new Value();
             Value.OnSet += ValueSet;
+
+            _createInitialData();
 
             if (parent != null)
             {
