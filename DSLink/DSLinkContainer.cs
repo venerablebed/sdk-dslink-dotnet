@@ -1,5 +1,7 @@
 using System;
 using System.Threading.Tasks;
+using Castle.MicroKernel.Registration;
+using Castle.Windsor;
 using DSLink.Connection;
 using DSLink.Logger;
 using Newtonsoft.Json.Linq;
@@ -12,41 +14,49 @@ namespace DSLink
     public class DSLinkContainer
     {
         private static readonly BaseLogger Log = LogManager.GetLogger();
-        
-        private readonly PeriodicTask _pingPeriodicTask;
-        private Handshake _handshake;
-        private bool _isLinkInitialized;
-        private readonly Configuration _config;
-        private readonly DSLinkResponder _responder;
-        private readonly DSLinkRequester _requester;
-        private readonly Connector _connector;
 
-        public Configuration Config => _config;
-        public virtual Responder Responder => _responder;
-        public virtual DSLinkRequester Requester => _requester;
-        public virtual Connector Connector => _connector;
+        public readonly IWindsorContainer Container;
+        
+        private bool _isLinkInitialized;
+
+        public Configuration Config => Container.Resolve<Configuration>();
+        public Handshake Handshake => Container.Resolve<Handshake>();
+        public Responder Responder => Container.Resolve<Responder>();
+        public DSLinkRequester Requester => Container.Resolve<DSLinkRequester>();
+        public Connector Connector => Container.Resolve<Connector>();
 
         public DSLinkContainer(Configuration config)
         {
-            _pingPeriodicTask = new PeriodicTask(OnPingTaskElapsed, 30000);
-            _config = config;
-            _config._processOptions();
-            _connector = new WebSocketConnector(_config);
+            Container = _bootstrapContainer();
+            Container.Register(Component.For<DSLinkContainer>().Instance(this));
+            Container.Register(Component.For<Configuration>().Instance(config));
+            Container.Register(Component.For<Handshake>().ImplementedBy<Handshake>());
+            Container.Register(Component.For<Connector>().ImplementedBy<WebSocketConnector>());
+            
+            Config._processOptions();
 
             if (Config.Responder)
             {
-                _responder = new DSLinkResponder(this);
-            }
-            if (Config.Requester)
-            {
-                _requester = new DSLinkRequester(this);
+                Log.Debug("Windsor - Installing DSLink Responder");
+                Container.Install(new DSLinkResponderInstaller());
             }
 
+            if (Config.Requester)
+            {
+                Log.Debug("Windsor - Installing DSLink Requester");
+                Container.Install(new DSLinkRequesterInstaller());
+            }
+            
             // Connector events
-            _connector.OnMessage += OnMessage;
-            _connector.OnOpen += OnOpen;
-            _connector.OnClose += OnClose;
-            _connector.OnFailure += OnFailure;
+            Connector.OnMessage += OnMessage;
+            Connector.OnOpen += OnOpen;
+            Connector.OnClose += OnClose;
+            Connector.OnFailure += OnFailure;
+        }
+
+        private static IWindsorContainer _bootstrapContainer()
+        {
+            return new WindsorContainer();
         }
 
         /// <summary>
@@ -61,17 +71,16 @@ namespace DSLink
             }
             _isLinkInitialized = true;
             
-            await _config._initKeyPair();
-
-            _responder?.Init();
-            _requester?.Init();
+            await Config._initKeyPair();
 
             if (Config.Responder)
             {
+                Responder.Init();
+                
                 var initDefault = true;
                 if (Config.LoadNodesJson)
                 {
-                    initDefault = !(await LoadSavedNodes());
+                    initDefault = !(await Responder.LoadSavedNodes(this));
                 }
                 if (initDefault)
                 {
@@ -91,15 +100,14 @@ namespace DSLink
         {
             await Initialize();
 
-            _handshake = new Handshake(this);
             var attemptsLeft = maxAttempts;
             uint attempts = 1;
             while (maxAttempts == 0 || attemptsLeft > 0)
             {
-                var handshakeResult = await _handshake.Shake();
+                var handshakeResult = await Handshake.Shake();
                 if (handshakeResult != null)
                 {
-                    _config.RemoteEndpoint = handshakeResult;
+                    Config.RemoteEndpoint = handshakeResult;
                     await Connector.Connect();
                     return Connector.State;
                 }
@@ -128,38 +136,17 @@ namespace DSLink
             await Connector.Disconnect();
         }
 
-        public async Task<bool> LoadSavedNodes()
-        {
-            if (_responder == null)
-            {
-                throw new DSAException(this, "Responder is not enabled.");
-            }
-            
-            return await Responder.DiskSerializer.DeserializeFromDisk();
-        }
-
-        public async Task SaveNodes()
-        {
-            if (_responder == null)
-            {
-                throw new DSAException(this, "Responder is not enabled.");
-            }
-            
-            await Responder.DiskSerializer.SerializeToDisk();
-        }
-
         private async void OnOpen()
         {
             OnConnectionOpen();
-            _pingPeriodicTask.Start();
             await Connector.Flush();
         }
 
         private void OnClose()
         {
             OnConnectionClosed();
-            _pingPeriodicTask.Stop();
-            if (Responder != null)
+            
+            if (Config.Responder)
             {
                 Log.Debug("Resetting responder state");
                 Responder.SubscriptionManager.ClearAll();
@@ -170,8 +157,6 @@ namespace DSLink
         private async void OnFailure()
         {
             OnConnectionFailed();
-            _pingPeriodicTask.Stop();
-
             await Connect();
         }
 
@@ -203,16 +188,6 @@ namespace DSLink
 
             var write = false;
 
-            if (message["requests"] != null)
-            {
-                var responses = await Responder.ProcessRequests(message["requests"].Value<JArray>());
-                if (responses.Count > 0)
-                {
-                    response["responses"] = responses;
-                }
-                write = true;
-            }
-
             if (message["responses"] != null)
             {
                 var requests = await Requester.ProcessResponses(message["responses"].Value<JArray>());
@@ -223,19 +198,19 @@ namespace DSLink
                 write = true;
             }
 
+            if (message["requests"] != null)
+            {
+                var responses = await Responder.ProcessRequests(message["requests"].Value<JArray>());
+                if (responses.Count > 0)
+                {
+                    response["responses"] = responses;
+                }
+                write = true;
+            }
+
             if (write)
             {
                 await Connector.Send(response);
-            }
-        }
-
-        private async void OnPingTaskElapsed()
-        {
-            if (Connector.State == ConnectionState.Connected)
-            {
-                // Write a blank message containing no responses/requests.
-                // Disable the queue for this specific message.
-                await Connector.Send(new JObject(), false);
             }
         }
     }

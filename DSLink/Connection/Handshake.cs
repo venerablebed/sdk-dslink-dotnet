@@ -13,35 +13,23 @@ namespace DSLink.Connection
     public class Handshake
     {
         private static readonly BaseLogger Log = LogManager.GetLogger();
-        
-        /// <summary>
-        /// DSA Version.
-        /// </summary>
-        private const string _dsaVersion = "1.1.2";
-
-        /// <summary>
-        /// Instance of link container.
-        /// </summary>
-        private readonly DSLinkContainer _link;
-
-        /// <summary>
-        /// HttpClient for handshaking.
-        /// </summary>
+        private const string DsaVersion = "1.1.2";
+        private readonly Configuration _config;
         private readonly HttpClient _httpClient;
 
-        public Handshake(DSLinkContainer link)
+        public Handshake(Configuration config)
         {
-            _link = link;
+            _config = config;
             _httpClient = new HttpClient();
         }
 
         private string _buildUrl()
         {
-            var url = _link.Config.BrokerUrl;
-            url += "?dsId=" + _link.Config.DsId;
-            if (_link.Config.HasToken)
+            var url = _config.BrokerUrl;
+            url += "?dsId=" + _config.DsId;
+            if (_config.HasToken)
             {
-                url += "&token=" + _link.Config.TokenParameter;
+                url += "&token=" + _config.TokenParameter;
             }
             return url;
         }
@@ -101,13 +89,12 @@ namespace DSLink.Connection
         {
             return new JObject
             {
-                {"publicKey", UrlBase64.Encode(_link.Config.KeyPair.EncodedPublicKey)},
-                {"isRequester", _link.Config.Requester},
-                {"isResponder", _link.Config.Responder},
+                {"publicKey", UrlBase64.Encode(_config.KeyPair.EncodedPublicKey)},
+                {"isRequester", _config.Requester},
+                {"isResponder", _config.Responder},
                 {"linkData", new JObject()},
-                {"version", _dsaVersion},
-                {"formats", new JArray(Serializers.Types.Keys.ToList())},
-                {"enableWebSocketCompression", _link.Connector.SupportsCompression}
+                {"version", DsaVersion},
+                {"formats", new JArray(Serializers.Types.Keys.ToList())}
             };
         }
     }

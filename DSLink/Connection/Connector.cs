@@ -25,6 +25,12 @@ namespace DSLink.Connection
         /// false, the flush method is automatically called.
         /// </summary>
         private JObject _queue;
+        
+        /// <summary>
+        /// A PeriodicTask that is used to occasionally (usually thirty seconds)
+        /// send an empty message to keep the connection alive.
+        /// </summary>
+        private readonly PeriodicTask _pingPeriodicTask;
 
         /// <summary>
         /// Queue lock object.
@@ -92,6 +98,7 @@ namespace DSLink.Connection
         protected Connector(Configuration config)
         {
             _config = config;
+            _pingPeriodicTask = new PeriodicTask(_onPingTaskElapsed, 30000);
             State = ConnectionState.Disconnected;
             _msgId = new IncrementingIndex();
 
@@ -143,6 +150,7 @@ namespace DSLink.Connection
 
             if (State == ConnectionState.Connected)
             {
+                _pingPeriodicTask.Start();
                 OnOpen?.Invoke();
             }
             else
@@ -163,7 +171,12 @@ namespace DSLink.Connection
 
             if (State == ConnectionState.Disconnected)
             {
+                _pingPeriodicTask.Stop();
                 OnClose?.Invoke();
+            }
+            else
+            {
+                Log.Error("Connection did not properly disconnect");
             }
         }
 
@@ -417,6 +430,16 @@ namespace DSLink.Connection
                 }
 
                 Log.Debug(logString);
+            }
+        }
+        
+        private async void _onPingTaskElapsed()
+        {
+            if (State == ConnectionState.Connected)
+            {
+                // Write a blank message containing no responses/requests.
+                // Disable the queue for this specific message.
+                await Send(new JObject(), false);
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Logger;
 using Newtonsoft.Json.Linq;
 using DSLink.Util;
@@ -11,25 +12,25 @@ namespace DSLink.Request
     {
         private static readonly BaseLogger Log = LogManager.GetLogger();
         
-        private readonly DSLinkContainer _link;
+        private readonly Connector _connector;
         private readonly Dictionary<string, Subscription> _subscriptions;
         private readonly Dictionary<int, string> _subIdToPath;
         private readonly Dictionary<int, string> _realSubIdToPath;
         private readonly IncrementingIndex _subscriptionId;
         
-        public RemoteSubscriptionManager(DSLinkContainer link)
+        public RemoteSubscriptionManager(Connector connector)
         {
-            _link = link;
+            _connector = connector;
             _subscriptions = new Dictionary<string, Subscription>();
             _subIdToPath = new Dictionary<int, string>();
             _realSubIdToPath = new Dictionary<int, string>();
             _subscriptionId = new IncrementingIndex();
         }
 
-        public async Task<int> Subscribe(string path, Action<SubscriptionUpdate> callback, int qos)
+        public async Task<int> Subscribe(int rid, string path, Action<SubscriptionUpdate> callback, int qos)
         {
             var sid = _subscriptionId.Next;
-            var request = new SubscribeRequest(_link.Requester.RequestId.Next, new JArray
+            var request = new SubscribeRequest(rid, new JArray
             {
                 new JObject
                 {
@@ -41,7 +42,7 @@ namespace DSLink.Request
             if (!_subscriptions.ContainsKey(path))
             {
                 _subscriptions.Add(path, new Subscription(sid));
-                await _link.Connector.Send(new JObject
+                await _connector.Send(new JObject
                 {
                     new JProperty("requests", new JArray
                     {
@@ -56,7 +57,7 @@ namespace DSLink.Request
             return sid;
         }
 
-        public async Task Unsubscribe(int subId)
+        public async Task Unsubscribe(int rid, int subId)
         {
             var path = _subIdToPath[subId];
             var sub = _subscriptions[path];
@@ -64,22 +65,22 @@ namespace DSLink.Request
             _subIdToPath.Remove(subId);
             if (sub.VirtualSubs.Count == 0)
             {
-                await _link.Connector.Send(new JObject
+                await _connector.Send(new JObject
                 {
                     new JProperty("requests", new JArray
                     {
                         new UnsubscribeRequest(
-                            _link.Requester.RequestId.Next,
+                            rid,
                             new JArray
                             {
-                                sub.RealSubID
+                                sub.RealSubId
                             }
                         ).Serialize()
                     })
                 });
                 _subscriptions.Remove(path);
-                _subIdToPath.Remove(sub.RealSubID);
-                _realSubIdToPath.Remove(sub.RealSubID);
+                _subIdToPath.Remove(sub.RealSubId);
+                _realSubIdToPath.Remove(sub.RealSubId);
             }
         }
 
@@ -111,14 +112,14 @@ namespace DSLink.Request
             }
         }
 
-        public class Subscription
+        private class Subscription
         {
             public Subscription(int subId)
             {
-                RealSubID = subId;
+                RealSubId = subId;
             }
 
-            public readonly int RealSubID;
+            public readonly int RealSubId;
             public readonly Dictionary<int, Action<SubscriptionUpdate>> VirtualSubs = new Dictionary<int, Action<SubscriptionUpdate>>();
         }
     }

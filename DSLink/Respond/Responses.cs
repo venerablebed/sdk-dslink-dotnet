@@ -1,33 +1,26 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Nodes;
+using DSLink.Request;
 using Newtonsoft.Json.Linq;
 
 namespace DSLink.Respond
 {
-    /// <summary>
-    /// Base response.
-    /// </summary>
     public class Response
     {
-        /// <summary>
-        /// DSLink container.
-        /// </summary>
-        private readonly DSLinkContainer _link;
-
-        /// <summary>
-        /// Request identifier for request.
-        /// </summary>
-        public int RequestID
+        protected readonly Connector Connector;
+        protected readonly RequestManager RequestManager;
+        
+        public int RequestId
         {
             get;
-            protected set;
         }
 
-        public Response(DSLinkContainer link, int requestID)
+        public Response(Connector connector, RequestManager requestManager, int requestId)
         {
-            _link = link;
-            RequestID = requestID;
+            Connector = connector;
+            RequestManager = requestManager;
+            RequestId = requestId;
         }
 
         /// <summary>
@@ -35,18 +28,14 @@ namespace DSLink.Respond
         /// </summary>
         public async Task Close()
         {
-            if (_link == null)
-            {
-                throw new NullReferenceException("Link is null, cannot close stream.");
-            }
-            _link.Requester.RequestManager.StopRequest(RequestID);
-            await _link.Connector.Send(new JObject
+            RequestManager.StopRequest(RequestId);
+            await Connector.Send(new JObject
             {
                 new JProperty("responses", new JObject
                 {
                     new JObject
                     {
-                        new JProperty("rid", RequestID),
+                        new JProperty("rid", RequestId),
                         new JProperty("stream", "closed")
                     }
                 })
@@ -71,12 +60,11 @@ namespace DSLink.Respond
         public Node Node
         {
             get;
-            protected set;
         }
 
-        public ListResponse(DSLinkContainer link, int requestID,
-                            string path, Node node)
-            : base(link, requestID)
+        public ListResponse(Connector connector, RequestManager requestManager,
+            int requestId, string path, Node node)
+            : base(connector, requestManager, requestId)
         {
             Path = path;
             Node = node;
@@ -119,10 +107,9 @@ namespace DSLink.Respond
         /// </summary>
         public bool HasUpdates => Updates.Count > 0;
 
-        public InvokeResponse(DSLinkContainer link, int requestID,
-                              string path, JArray columns,
-                              JArray updates)
-            : base(link, requestID)
+        public InvokeResponse(Connector connector, RequestManager requestManager, int requestID,
+            string path, JArray columns, JArray updates)
+            : base(connector, requestManager, requestID)
         {
             Path = path;
             Columns = columns;

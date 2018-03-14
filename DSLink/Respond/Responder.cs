@@ -10,34 +10,34 @@ namespace DSLink.Respond
     {
         internal IDictionary<string, Action<Node>> NodeClasses;
 
-        internal virtual DSLinkContainer Link
+        public DSLinkContainer Link
         {
             get;
             set;
         }
 
-        public virtual SuperRootNode SuperRoot
+        public SuperRootNode SuperRoot
         {
             get;
-            protected set;
+            set;
         }
 
-        public virtual SubscriptionManager SubscriptionManager
+        public SubscriptionManager SubscriptionManager
         {
             get;
-            protected set;
+            set;
         }
 
-        public virtual StreamManager StreamManager
+        public StreamManager StreamManager
         {
             get;
-            protected set;
+            set;
         }
 
-        public virtual DiskSerializer DiskSerializer
+        public DiskSerializer DiskSerializer
         {
             get;
-            protected set;
+            set;
         }
 
         public Responder()
@@ -45,9 +45,6 @@ namespace DSLink.Respond
             NodeClasses = new Dictionary<string, Action<Node>>();
         }
 
-        /// <summary>
-        /// Initialize the responder.
-        /// </summary>
         public abstract void Init();
 
         /// <summary>
@@ -63,5 +60,15 @@ namespace DSLink.Respond
         /// <param name="name">Name of the class</param>
         /// <param name="factory">Factory function for the class. First parameter is the node.</param>
         public abstract void AddNodeClass(string name, Action<Node> factory);
+
+        public async Task<bool> LoadSavedNodes(DSLinkContainer dsLinkContainer)
+        {
+            return await DiskSerializer.DeserializeFromDisk();
+        }
+
+        public async Task SaveNodes()
+        {
+            await DiskSerializer.SerializeToDisk();
+        }
     }
 }

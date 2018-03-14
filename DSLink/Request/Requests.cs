@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Nodes;
 using DSLink.Nodes.Actions;
 using DSLink.Respond;
@@ -21,9 +22,9 @@ namespace DSLink.Request
             private set;
         }
 
-        protected BaseRequest(int requestID)
+        protected BaseRequest(int requestId)
         {
-            RequestID = requestID;
+            RequestID = requestId;
         }
 
         /// <summary>
@@ -59,7 +60,7 @@ namespace DSLink.Request
         /// </summary>
         public readonly string Path;
 
-        public ListRequest(int requestID, Action<ListResponse> callback, string path) : base(requestID)
+        public ListRequest(int requestId, Action<ListResponse> callback, string path) : base(requestId)
         {
             Callback = callback;
             Path = path;
@@ -101,7 +102,7 @@ namespace DSLink.Request
         /// </summary>
         public readonly Value Value;
 
-        public SetRequest(int requestID, string path, Permission permission, Value value) : base(requestID)
+        public SetRequest(int requestId, string path, Permission permission, Value value) : base(requestId)
         {
             Path = path;
             Permission = permission;
@@ -139,7 +140,7 @@ namespace DSLink.Request
             get;
         }
 
-        public RemoveRequest(int requestID, string path) : base(requestID)
+        public RemoveRequest(int requestId, string path) : base(requestId)
         {
             Path = path;
         }
@@ -185,10 +186,7 @@ namespace DSLink.Request
         /// </summary>
         public readonly Action<InvokeResponse> Callback;
 
-        /// <summary>
-        /// Link container.
-        /// </summary>
-        private readonly DSLinkContainer _link;
+        private readonly Connector _connector;
 
         /// <summary>
         /// Columns of the request.
@@ -205,26 +203,20 @@ namespace DSLink.Request
         /// </summary>
         public Table.Mode Mode;
 
-        public InvokeRequest(int requestID, string path, Permission permission, JObject parameters,
-                             Action<InvokeResponse> callback = null, DSLinkContainer link = null,
-                             JArray columns = null) : base(requestID)
+        public InvokeRequest(int requestId, string path, Permission permission, JObject parameters,
+                             Action<InvokeResponse> callback = null, Connector connector = null,
+                             JArray columns = null) : base(requestId)
         {
             Path = path;
             Permission = permission;
             Parameters = parameters;
             Callback = callback;
-            _link = link;
+            _connector = connector;
             _columns = columns;
         }
 
-        /// <summary>
-        /// Method of the request.
-        /// </summary>
         public override string Method => "invoke";
 
-        /// <summary>
-        /// Serialize the request.
-        /// </summary>
         public override JObject Serialize()
         {
             var baseSerialized = base.Serialize();
@@ -243,7 +235,7 @@ namespace DSLink.Request
         /// <param name="table">Table</param>
         public async Task UpdateTable(Table table)
         {
-            if (_link == null || _columns == null)
+            if (_connector == null || _columns == null)
             {
                 throw new NotSupportedException("Link and columns are null, cannot send updates");
             }
@@ -272,7 +264,7 @@ namespace DSLink.Request
 
                 updateRootObject["responses"].First["columns"] = _columns;
             }
-            await _link.Connector.Send(updateRootObject);
+            await _connector.Send(updateRootObject);
         }
 
         /// <summary>
@@ -280,11 +272,11 @@ namespace DSLink.Request
         /// </summary>
         public async Task Close()
         {
-            if (_link == null)
+            if (_connector == null)
             {
-                throw new NotSupportedException("Link is null, cannot send updates");
+                return;
             }
-            await _link.Connector.Send(new JObject
+            await _connector.Send(new JObject
             {
                 new JProperty("responses", new JArray
                 {
@@ -313,7 +305,7 @@ namespace DSLink.Request
         /// </summary>
         public readonly Action<SubscriptionUpdate> Callback;
 
-        public SubscribeRequest(int requestID, JArray paths, Action<SubscriptionUpdate> callback) : base(requestID)
+        public SubscribeRequest(int requestId, JArray paths, Action<SubscriptionUpdate> callback) : base(requestId)
         {
             Paths = paths;
             Callback = callback;
@@ -345,7 +337,7 @@ namespace DSLink.Request
         /// </summary>
         public readonly JArray Sids;
 
-        public UnsubscribeRequest(int requestID, JArray sids) : base(requestID)
+        public UnsubscribeRequest(int requestId, JArray sids) : base(requestId)
         {
             Sids = sids;
         }

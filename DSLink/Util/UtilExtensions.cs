@@ -1,4 +1,5 @@
 ﻿using System;
+using Castle.MicroKernel;
 using Newtonsoft.Json.Linq;
 
 namespace DSLink.Util
@@ -27,6 +28,11 @@ namespace DSLink.Util
         public static string ToIso8601(this DateTime dateTime)
         {
             return dateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        }
+
+        public static bool HasComponent<T>(this IKernel kernel)
+        {
+            return kernel.HasComponent(typeof(T));
         }
     }
 }

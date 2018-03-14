@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Logger;
 using DSLink.Nodes;
 using DSLink.Respond;
@@ -20,28 +21,28 @@ namespace DSLink.Request
         private readonly DSLinkContainer _link;
         internal readonly IncrementingIndex RequestId;
 
+        public Connector Connector
+        {
+            get;
+            set;
+        }
+
         public RequestManager RequestManager
         {
             get;
-            private set;
+            set;
         }
 
         public RemoteSubscriptionManager RemoteSubscriptionManager
         {
             get;
-            private set;
+            set;
         }
 
         public DSLinkRequester(DSLinkContainer link)
         {
             _link = link;
             RequestId = new IncrementingIndex(1);
-        }
-
-        public void Init()
-        {
-            RequestManager = new RequestManager();
-            RemoteSubscriptionManager = new RemoteSubscriptionManager(_link);
         }
 
         /// <summary>
@@ -137,24 +138,25 @@ namespace DSLink.Request
                 throw new Exception("Path can not be null or empty.");
             }
 
-            return await RemoteSubscriptionManager.Subscribe(path, callback, qos);
+            return await RemoteSubscriptionManager.Subscribe(RequestId.Next, path, callback, qos);
         }
 
         /// <summary>
         /// Unsubscribe from a subscription ID.
         /// </summary>
-        /// <param name="path">Subscription ID</param>
+        /// <param name="subId">Subscription ID to unsubscribe from.</param>
         public async Task Unsubscribe(int subId)
         {
-            await RemoteSubscriptionManager.Unsubscribe(subId);
+            await RemoteSubscriptionManager.Unsubscribe(RequestId.Next, subId);
         }
 
         internal async Task<JArray> ProcessResponses(JArray responses)
         {
             var requests = new JArray();
 
-            foreach (JObject response in responses)
+            foreach (var jToken in responses)
             {
+                var response = (JObject) jToken;
                 await ProcessResponse(response);
             }
 
@@ -185,36 +187,35 @@ namespace DSLink.Request
         {
             foreach (dynamic update in response["updates"])
             {
-                if (update is JArray)
+                switch (update)
                 {
-                    ProcessUpdateArray(update);
-                }
-                else if (update is JObject)
-                {
-                    ProcessUpdateObject(update);
+                    case JArray _:
+                        ProcessUpdateArray(update);
+                        break;
+                    case JObject _:
+                        ProcessUpdateObject(update);
+                        break;
                 }
             }
         }
 
-        private void ProcessUpdateArray(dynamic update)
+        private void ProcessUpdateArray(JArray update)
         {
-            JArray arrayUpdate = update;
-            int sid = arrayUpdate[0].Value<int>();
-            JToken value = arrayUpdate[1];
-            string dt = arrayUpdate[2].Value<string>();
+            var sid = update[0].Value<int>();
+            var value = update[1];
+            var dt = update[2].Value<string>();
             RemoteSubscriptionManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, dt));
         }
 
-        private void ProcessUpdateObject(dynamic update)
+        private void ProcessUpdateObject(JObject update)
         {
-            JObject objectUpdate = update;
-            int sid = objectUpdate["sid"].Value<int>();
-            JToken value = objectUpdate["value"];
-            string ts = objectUpdate["ts"].Value<string>();
-            int count = objectUpdate["count"].Value<int>();
-            int sum = objectUpdate["sum"].Value<int>();
-            int min = objectUpdate["min"].Value<int>();
-            int max = objectUpdate["max"].Value<int>();
+            var sid = update["sid"].Value<int>();
+            var value = update["value"];
+            var ts = update["ts"].Value<string>();
+            var count = update["count"].Value<int>();
+            var sum = update["sum"].Value<int>();
+            var min = update["min"].Value<int>();
+            var max = update["max"].Value<int>();
             RemoteSubscriptionManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, ts, count, sum, min, max));
         }
 
@@ -229,7 +230,8 @@ namespace DSLink.Request
                     var name = listRequest.Path.Split('/').Last();
                     var node = new RemoteNode(name, null, listRequest.Path);
                     node.FromSerialized(response["updates"].Value<JArray>());
-                    await Task.Run(() => listRequest.Callback(new ListResponse(_link, rid, listRequest.Path, node)));
+                    await Task.Run(() => listRequest.Callback(
+                        new ListResponse(_link.Connector, RequestManager, rid, listRequest.Path, node)));
                     break;
                 case SetRequest _:
                     RequestManager.StopRequest(rid);
@@ -240,12 +242,15 @@ namespace DSLink.Request
                 case InvokeRequest _:
                     var invokeRequest = (InvokeRequest) request;
                     var path = invokeRequest.Path;
-                    var columns = response.GetValue("columns") != null ? response["columns"].Value<JArray>() : new JArray();
-                    var updates = response.GetValue("updates") != null ? response["updates"].Value<JArray>() : new JArray();
+                    var columns = response.GetValue("columns") != null
+                        ? response["columns"].Value<JArray>() : new JArray();
+                    var updates = response.GetValue("updates") != null
+                        ? response["updates"].Value<JArray>() : new JArray();
                 
                     await Task.Run(() =>
                     {
-                        invokeRequest?.Callback(new InvokeResponse(_link, rid, path, columns, updates));
+                        invokeRequest.Callback(
+                            new InvokeResponse(_link.Connector, RequestManager, rid, path, columns, updates));
                     });
                     break;
             }

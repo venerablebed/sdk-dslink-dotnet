@@ -32,7 +32,7 @@ namespace DSLink.Example
             var dslink = new ExampleDSLink(config);
 
             await dslink.Connect();
-            await dslink.SaveNodes();
+            await dslink.Responder.SaveNodes();
         }
 
         public ExampleDSLink(Configuration config) : base(config)
@@ -109,7 +109,7 @@ namespace DSLink.Example
             Responder.SuperRoot.CreateChild(rngName, "rng").BuildNode();
 
             await request.Close();
-            await SaveNodes();
+            await Responder.SaveNodes();
         }
     }
 }

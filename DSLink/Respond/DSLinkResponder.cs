@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Nodes;
 using DSLink.Request;
 using Newtonsoft.Json.Linq;
@@ -8,16 +9,15 @@ namespace DSLink.Respond
 {
     public class DSLinkResponder : Responder
     {
-        public DSLinkResponder(DSLinkContainer link)
+        private readonly Connector _connector;
+        
+        public DSLinkResponder(Connector connector)
         {
-            Link = link;
+            _connector = connector;
         }
 
         public override void Init()
         {
-            DiskSerializer = new DiskSerializer(this);
-            SubscriptionManager = new SubscriptionManager(Link);
-            StreamManager = new StreamManager(Link);
             SuperRoot = new SuperRootNode(Link, "", null);
             SuperRoot.Configs.Set("is", new Value("dsa/link"));
             SuperRoot.Configs.Set("$dsId", new Value(Link.Config.DsId));
@@ -151,7 +151,7 @@ namespace DSLink.Respond
                     }
                     var permit = (request["permit"] != null) ? Permission.PermissionMap[request["permit"].Value<string>().ToLower()] : null;
                     var invokeRequest = new InvokeRequest(request["rid"].Value<int>(), request["path"].Value<string>(),
-                                                          permit, request["params"].Value<JObject>(), link: Link,
+                                                          permit, request["params"].Value<JObject>(), connector: _connector,
                                                           columns: columns);
                     await Task.Run(() => node.ActionHandler.Function.Invoke(invokeRequest));
                 }
