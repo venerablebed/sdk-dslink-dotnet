@@ -14,35 +14,16 @@ namespace DSLink.Request
     /// The requester module of a DSLink gives the ability access to
     /// outer data on the broker.
     /// </summary>
-    public class DSLinkRequester
+    public class DSLinkRequester : Requester
     {
         private static readonly BaseLogger Log = LogManager.GetLogger();
+        private readonly Connector _connector;
         
-        private readonly DSLinkContainer _link;
-        internal readonly IncrementingIndex RequestId;
-
-        public Connector Connector
+        public DSLinkRequester(Connector connector, RequestManager requestManager,
+            RemoteSubscriptionManager remoteSubManager)
+            : base(requestManager, remoteSubManager)
         {
-            get;
-            set;
-        }
-
-        public RequestManager RequestManager
-        {
-            get;
-            set;
-        }
-
-        public RemoteSubscriptionManager RemoteSubscriptionManager
-        {
-            get;
-            set;
-        }
-
-        public DSLinkRequester(DSLinkContainer link)
-        {
-            _link = link;
-            RequestId = new IncrementingIndex(1);
+            _connector = connector;
         }
 
         /// <summary>
@@ -54,7 +35,7 @@ namespace DSLink.Request
         {
             var request = new ListRequest(RequestId.Next, callback, path);
             RequestManager.StartRequest(request);
-            await _link.Connector.Send(new JObject
+            await _connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -74,7 +55,7 @@ namespace DSLink.Request
         {
             var request = new SetRequest(RequestId.Next, path, permission, value);
             RequestManager.StartRequest(request);
-            await _link.Connector.Send(new JObject
+            await _connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -92,7 +73,7 @@ namespace DSLink.Request
         {
             var request = new RemoveRequest(RequestId.Next, path);
             RequestManager.StartRequest(request);
-            await _link.Connector.Send(new JObject
+            await _connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -113,7 +94,7 @@ namespace DSLink.Request
         {
             var request = new InvokeRequest(RequestId.Next, path, permission, parameters, callback);
             RequestManager.StartRequest(request);
-            await _link.Connector.Send(new JObject
+            await _connector.Send(new JObject
             {
                 new JProperty("requests", new JArray
                 {
@@ -138,7 +119,7 @@ namespace DSLink.Request
                 throw new Exception("Path can not be null or empty.");
             }
 
-            return await RemoteSubscriptionManager.Subscribe(RequestId.Next, path, callback, qos);
+            return await RemoteSubManager.Subscribe(RequestId.Next, path, callback, qos);
         }
 
         /// <summary>
@@ -147,7 +128,7 @@ namespace DSLink.Request
         /// <param name="subId">Subscription ID to unsubscribe from.</param>
         public async Task Unsubscribe(int subId)
         {
-            await RemoteSubscriptionManager.Unsubscribe(RequestId.Next, subId);
+            await RemoteSubManager.Unsubscribe(RequestId.Next, subId);
         }
 
         internal async Task<JArray> ProcessResponses(JArray responses)
@@ -204,7 +185,7 @@ namespace DSLink.Request
             var sid = update[0].Value<int>();
             var value = update[1];
             var dt = update[2].Value<string>();
-            RemoteSubscriptionManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, dt));
+            RemoteSubManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, dt));
         }
 
         private void ProcessUpdateObject(JObject update)
@@ -216,7 +197,7 @@ namespace DSLink.Request
             var sum = update["sum"].Value<int>();
             var min = update["min"].Value<int>();
             var max = update["max"].Value<int>();
-            RemoteSubscriptionManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, ts, count, sum, min, max));
+            RemoteSubManager.InvokeSubscriptionUpdate(sid, new SubscriptionUpdate(sid, value, ts, count, sum, min, max));
         }
 
         private async Task ProcessRequestUpdates(JObject response, int rid)
@@ -231,7 +212,7 @@ namespace DSLink.Request
                     var node = new RemoteNode(name, null, listRequest.Path);
                     node.FromSerialized(response["updates"].Value<JArray>());
                     await Task.Run(() => listRequest.Callback(
-                        new ListResponse(_link.Connector, RequestManager, rid, listRequest.Path, node)));
+                        new ListResponse(_connector, RequestManager, rid, listRequest.Path, node)));
                     break;
                 case SetRequest _:
                     RequestManager.StopRequest(rid);
@@ -250,7 +231,7 @@ namespace DSLink.Request
                     await Task.Run(() =>
                     {
                         invokeRequest.Callback(
-                            new InvokeResponse(_link.Connector, RequestManager, rid, path, columns, updates));
+                            new InvokeResponse(_connector, RequestManager, rid, path, columns, updates));
                     });
                     break;
             }

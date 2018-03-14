@@ -16,7 +16,7 @@ namespace DSLink.Respond
             set;
         }
 
-        public SuperRootNode SuperRoot
+        public Node SuperRoot
         {
             get;
             set;
@@ -61,14 +61,14 @@ namespace DSLink.Respond
         /// <param name="factory">Factory function for the class. First parameter is the node.</param>
         public abstract void AddNodeClass(string name, Action<Node> factory);
 
-        public async Task<bool> LoadSavedNodes(DSLinkContainer dsLinkContainer)
+        public Task<bool> LoadSavedNodes()
         {
-            return await DiskSerializer.DeserializeFromDisk();
+            return DiskSerializer.DeserializeFromDisk();
         }
 
-        public async Task SaveNodes()
+        public Task SaveNodes()
         {
-            await DiskSerializer.SerializeToDisk();
+            return DiskSerializer.SerializeToDisk();
         }
     }
 }

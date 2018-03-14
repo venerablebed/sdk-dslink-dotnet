@@ -11,16 +11,16 @@ namespace DSLink.Respond
     {
         private readonly Connector _connector;
         
-        public DSLinkResponder(Connector connector)
+        public DSLinkResponder(DSLinkContainer link, Connector connector)
         {
             _connector = connector;
+            SuperRoot = new SuperRootNode(link, "", null);
+            SuperRoot.Configs.Set("is", new Value("dsa/link"));
+            SuperRoot.Configs.Set("$dsId", new Value(link.Config.DsId));
         }
 
         public override void Init()
         {
-            SuperRoot = new SuperRootNode(Link, "", null);
-            SuperRoot.Configs.Set("is", new Value("dsa/link"));
-            SuperRoot.Configs.Set("$dsId", new Value(Link.Config.DsId));
         }
 
         public override void AddNodeClass(string name, Action<Node> factory)

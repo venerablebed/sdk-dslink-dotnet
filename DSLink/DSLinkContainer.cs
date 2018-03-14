@@ -80,7 +80,7 @@ namespace DSLink
                 var initDefault = true;
                 if (Config.LoadNodesJson)
                 {
-                    initDefault = !(await Responder.LoadSavedNodes(this));
+                    initDefault = !(await Responder.LoadSavedNodes());
                 }
                 if (initDefault)
                 {
