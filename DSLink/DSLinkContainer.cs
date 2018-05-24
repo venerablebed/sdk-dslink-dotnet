@@ -4,10 +4,10 @@ using Castle.MicroKernel.Registration;
 using Castle.Windsor;
 using DSLink.Connection;
 using DSLink.Logger;
+using DSLink.Nodes;
 using Newtonsoft.Json.Linq;
 using DSLink.Request;
 using DSLink.Respond;
-using DSLink.Util;
 
 namespace DSLink
 {
@@ -22,7 +22,7 @@ namespace DSLink
         public Configuration Config => Container.Resolve<Configuration>();
         public Handshake Handshake => Container.Resolve<Handshake>();
         public Responder Responder => Container.Resolve<Responder>();
-        public DSLinkRequester Requester => Container.Resolve<DSLinkRequester>();
+        public Requester Requester => Container.Resolve<Requester>();
         public Connector Connector => Container.Resolve<Connector>();
 
         public DSLinkContainer(Configuration config)
@@ -32,6 +32,7 @@ namespace DSLink
             Container.Register(Component.For<Configuration>().Instance(config));
             Container.Register(Component.For<Handshake>().ImplementedBy<Handshake>());
             Container.Register(Component.For<Connector>().ImplementedBy<WebSocketConnector>());
+            Container.Register(Component.For<SuperRootNode>().ImplementedBy<SuperRootNode>());
             
             Config._processOptions();
 
@@ -75,8 +76,6 @@ namespace DSLink
 
             if (Config.Responder)
             {
-                Responder.Init();
-                
                 var initDefault = true;
                 if (Config.LoadNodesJson)
                 {

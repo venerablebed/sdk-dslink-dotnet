@@ -9,11 +9,11 @@ namespace DSLink.Respond
         private static readonly BaseLogger Log = LogManager.GetLogger();
         
         private readonly Dictionary<int, string> _requestIdToPath = new Dictionary<int, string>();
-        private readonly DSLinkContainer _link;
+        private readonly Responder _responder;
 
-        public StreamManager(DSLinkContainer link)
+        public StreamManager(Responder responder)
         {
-            _link = link;
+            _responder = responder;
         }
 
         public void OpenStream(int requestId, Node node)
@@ -34,7 +34,7 @@ namespace DSLink.Respond
         {
             try
             {
-                var node = _link.Responder.SuperRoot.Get(_requestIdToPath[requestId]);
+                var node = _responder.SuperRoot.Get(_requestIdToPath[requestId]);
                 if (node != null)
                 {
                     lock (node._streams)

@@ -40,13 +40,13 @@ namespace DSLink.Test
             _mockConnector.Setup(c => c.AddValueUpdateResponse(It.IsAny<JToken>()))
                 .Returns(Task.FromResult(false));
             
-            _superRootNode = new SuperRootNode(_mockContainer.Object, "", null);
+            _superRootNode = new SuperRootNode(_mockResponder.Object, _mockConnector.Object);
         }
 
         [Test]
         public void EachBannedCharacterInName()
         {
-            foreach (char c in Node.BannedChars)
+            foreach (var c in Node.BannedChars)
             {
                 Assert.Throws<ArgumentException>(() =>
                 {

@@ -11,16 +11,12 @@ namespace DSLink.Respond
     {
         private readonly Connector _connector;
         
-        public DSLinkResponder(DSLinkContainer link, Connector connector)
+        public DSLinkResponder(Connector connector, SubscriptionManager subManager, StreamManager streamManager,
+            SuperRootNode superRoot)
+            : base(subManager, streamManager, superRoot)
         {
             _connector = connector;
-            SuperRoot = new SuperRootNode(link, "", null);
             SuperRoot.Configs.Set("is", new Value("dsa/link"));
-            SuperRoot.Configs.Set("$dsId", new Value(link.Config.DsId));
-        }
-
-        public override void Init()
-        {
         }
 
         public override void AddNodeClass(string name, Action<Node> factory)

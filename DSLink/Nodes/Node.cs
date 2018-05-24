@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Nodes.Actions;
+using DSLink.Respond;
 using DSLink.Util;
 using Newtonsoft.Json.Linq;
 
@@ -215,7 +217,7 @@ namespace DSLink.Nodes
                 Path = "/" + name;
             }
 
-            Root?.Link?.Responder.StreamManager.OnActivateNode(this);
+            Root?.Responder?.StreamManager.OnActivateNode(this);
         }
 
         private void _createInitialData()
@@ -233,11 +235,11 @@ namespace DSLink.Nodes
                 return;
             }
             _initializedClass = true;
-            if (!Root.Link.Responder.NodeClasses.ContainsKey(ClassName) ||
+            if (!Root.Responder.NodeClasses.ContainsKey(ClassName) ||
                 (PrivateConfigs.Has("nodeClassInit") && PrivateConfigs.Get("nodeClassInit").Boolean)) return;
             PrivateConfigs.Set("nodeClassInit", new Value(true));
             ResetNode();
-            Root.Link.Responder.NodeClasses[ClassName](this);
+            Root.Responder.NodeClasses[ClassName](this);
         }
 
         /// <summary>
@@ -417,7 +419,7 @@ namespace DSLink.Nodes
             {
                 foreach (var sid in _subscribers)
                 {
-                    tasks.Add(Root.Link.Connector.AddValueUpdateResponse(new JArray
+                    tasks.Add(Root.Connector.AddValueUpdateResponse(new JArray
                     {
                         sid,
                         value.JToken,
@@ -571,21 +573,23 @@ namespace DSLink.Nodes
 
         protected virtual async void UpdateSubscribers()
         {
-            if (Root?.Link != null)
+            if (Root?.Responder != null)
             {
-                await Root.Link.Responder.SubscriptionManager.UpdateSubscribers(this);
+                await Root.Responder.SubscriptionManager.UpdateSubscribers(this);
             }
         }
     }
 
     public class SuperRootNode : Node
     {
-        public readonly DSLinkContainer Link;
+        public readonly Responder Responder;
+        public readonly Connector Connector;
         
-        public SuperRootNode(DSLinkContainer link, string name, Node parent, string className = "node")
-            : base(name, parent, className)
+        public SuperRootNode(Responder responder, Connector connector)
+            : base("", null, "node")
         {
-            Link = link;
+            Responder = responder;
+            Connector = connector;
         }
     }
 }

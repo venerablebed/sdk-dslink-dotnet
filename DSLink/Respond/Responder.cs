@@ -9,26 +9,11 @@ namespace DSLink.Respond
     public abstract class Responder
     {
         internal IDictionary<string, Action<Node>> NodeClasses;
+        public readonly SubscriptionManager SubscriptionManager;
+        public readonly StreamManager StreamManager;
+        public readonly Node SuperRoot;
 
         public DSLinkContainer Link
-        {
-            get;
-            set;
-        }
-
-        public Node SuperRoot
-        {
-            get;
-            set;
-        }
-
-        public SubscriptionManager SubscriptionManager
-        {
-            get;
-            set;
-        }
-
-        public StreamManager StreamManager
         {
             get;
             set;
@@ -40,12 +25,12 @@ namespace DSLink.Respond
             set;
         }
 
-        public Responder()
+        public Responder(SubscriptionManager subManager, StreamManager streamManager, SuperRootNode superRoot)
         {
             NodeClasses = new Dictionary<string, Action<Node>>();
+            SubscriptionManager = subManager;
+            SuperRoot = superRoot;
         }
-
-        public abstract void Init();
 
         /// <summary>
         /// Process requests incoming from the broker.

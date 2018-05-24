@@ -2,6 +2,7 @@
 using DSLink.Nodes;
 using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
+using DSLink.Connection;
 using DSLink.Logger;
 
 namespace DSLink.Respond
@@ -11,12 +12,12 @@ namespace DSLink.Respond
         private static readonly BaseLogger Log = LogManager.GetLogger();
         
         private readonly Dictionary<int, Node> _subscriptionToNode;
-        private readonly DSLinkContainer _link;
+        private readonly Connector _connector;
 
-        public SubscriptionManager(DSLinkContainer link)
+        public SubscriptionManager(Connector connector)
         {
             _subscriptionToNode = new Dictionary<int, Node>();
-            _link = link;
+            _connector = connector;
         }
 
         public void Subscribe(int subscriptionId, Node node)
@@ -66,7 +67,7 @@ namespace DSLink.Respond
                         });
                     }
                 }
-                await _link.Connector.Send(new JObject
+                await _connector.Send(new JObject
                 {
                     new JProperty("responses", responses)
                 });

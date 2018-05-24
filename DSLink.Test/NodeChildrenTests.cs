@@ -36,7 +36,7 @@ namespace DSLink.Test
             _mockResponder.SetupGet(r => r.SubscriptionManager).Returns(_mockSubManager.Object);
             _mockResponder.SetupGet(r => r.StreamManager).Returns(_mockStreamManager.Object);
 
-            _superRootNode = new SuperRootNode(_mockContainer.Object, "", null);
+            _superRootNode = new SuperRootNode(_mockResponder.Object, _mockConnector.Object);
         }
 
         [Test]

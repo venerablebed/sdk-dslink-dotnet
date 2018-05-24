@@ -131,7 +131,7 @@ namespace DSLink.Request
             await RemoteSubManager.Unsubscribe(RequestId.Next, subId);
         }
 
-        internal async Task<JArray> ProcessResponses(JArray responses)
+        public override async Task<JArray> ProcessResponses(JArray responses)
         {
             var requests = new JArray();
 

@@ -7,8 +7,12 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using DSLink.Nodes;
 using System.Threading.Tasks;
+using Castle.MicroKernel.Registration;
+using Castle.Windsor;
 using DSLink.Nodes.Actions;
 using DSLink.Serializer;
+using DSLink.Test.Implementation;
+using Node = DSLink.Nodes.Node;
 
 namespace DSLink.Test
 {
@@ -16,29 +20,25 @@ namespace DSLink.Test
     public class ResponderTests
     {
         private Configuration _config;
-        private DSLinkResponder _responder;
+        private Responder _responder;
         private JsonSerializer _jsonSerializer;
-        private Mock<DSLinkContainer> _mockContainer;
-        private Mock<Connector> _mockConnector;
 
         [SetUp]
         public void SetUp()
         {
+            var container = new WindsorContainer();
             _config = new Configuration(new List<string>(), "Test", responder: true);
             _config.KeyPair.Generate();
             _jsonSerializer = new JsonSerializer();
+            
+            container.Register(Component.For<Configuration>().Instance(_config));
+            container.Register(Component.For<Connector>().ImplementedBy<TestConnector>());
+            container.Register(Component.For<Responder>().ImplementedBy<DSLinkResponder>());
+            container.Register(Component.For<SubscriptionManager>().ImplementedBy<SubscriptionManager>());
+            container.Register(Component.For<StreamManager>().ImplementedBy<StreamManager>());
+            container.Register(Component.For<SuperRootNode>().ImplementedBy<SuperRootNode>());
 
-            _mockContainer = new Mock<DSLinkContainer>(_config);
-            _mockConnector = new Mock<Connector>(
-                _mockContainer.Object.Config
-            );
-
-            _mockContainer.SetupGet(c => c.Connector).Returns(_mockConnector.Object);
-            _mockConnector.SetupGet(c => c.Serializer).Returns(_jsonSerializer);
-
-            _responder = new DSLinkResponder(_mockContainer.Object);
-            _mockContainer.SetupGet(c => c.Responder).Returns(_responder);
-            _responder.Init();
+            _responder = container.Resolve<Responder>();
 
             _responder.SuperRoot.CreateChild("testValue")
                 .SetType(DSLink.Nodes.ValueType.Number)
